@@ -236,7 +236,152 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 8. Verificação final
+-- 8. Super Palpite: Adicionar coluna is_super na tabela guesses
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'guesses'
+    AND column_name = 'is_super'
+  ) THEN
+    ALTER TABLE public.guesses ADD COLUMN is_super boolean DEFAULT false NOT NULL;
+    RAISE NOTICE 'Coluna is_super adicionada na tabela guesses.';
+  ELSE
+    RAISE NOTICE 'Coluna is_super já existe, pulando.';
+  END IF;
+END $$;
+
+
+-- 9. Super Palpite: Criar helper get_match_super_guess_stage
+CREATE OR REPLACE FUNCTION public.get_match_super_guess_stage(p_match_id bigint, p_round text)
+RETURNS text AS $$
+BEGIN
+  IF p_round = 'Fase de Grupos' THEN
+    IF p_match_id BETWEEN 1 AND 24 THEN
+      RETURN 'Grupo - Rodada 1';
+    ELSIF p_match_id BETWEEN 25 AND 48 THEN
+      RETURN 'Grupo - Rodada 2';
+    ELSE
+      RETURN 'Grupo - Rodada 3';
+    END IF;
+  ELSIF p_round IN ('Disputa de 3º lugar', 'Final') THEN
+    RETURN 'Fase Final';
+  ELSE
+    RETURN p_round;
+  END IF;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+
+-- 10. Super Palpite: Criar trigger de controle (1 por rodada)
+CREATE OR REPLACE FUNCTION public.tr_check_and_limit_super_guess()
+RETURNS trigger AS $$
+DECLARE
+  v_new_stage text;
+BEGIN
+  IF NEW.is_super = true THEN
+    SELECT public.get_match_super_guess_stage(m.id, m.round)
+    INTO v_new_stage
+    FROM public.matches m
+    WHERE m.id = NEW.match_id;
+
+    UPDATE public.guesses g
+    SET is_super = false
+    FROM public.matches m
+    WHERE g.match_id = m.id
+      AND g.user_id = NEW.user_id
+      AND g.id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      AND g.is_super = true
+      AND public.get_match_super_guess_stage(m.id, m.round) = v_new_stage;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS check_and_limit_super_guess_trigger ON public.guesses;
+CREATE TRIGGER check_and_limit_super_guess_trigger
+  BEFORE INSERT OR UPDATE OF is_super
+  ON public.guesses
+  FOR EACH ROW
+  WHEN (NEW.is_super = true)
+  EXECUTE FUNCTION public.tr_check_and_limit_super_guess();
+
+
+-- 11. Super Palpite: Atualizar recálculo de pontos do usuário para contar placares com pontos dobrados (10->20, 7->14)
+CREATE OR REPLACE FUNCTION public.recalculate_user_points(p_user_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.profiles
+  SET
+    total_points       = COALESCE((SELECT SUM(points_awarded) FROM public.guesses WHERE user_id = p_user_id AND points_awarded IS NOT NULL), 0),
+    exact_scores_count = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded = 10 OR (is_super = true AND points_awarded = 20))), 0),
+    pts7_count         = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded = 7 OR (is_super = true AND points_awarded = 14))), 0)
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- 12. Super Palpite: Atualizar trigger de encerramento de jogos para dobrar pontos se is_super = true
+CREATE OR REPLACE FUNCTION public.trigger_update_match_scores()
+RETURNS trigger AS $$
+DECLARE
+  guess_record record;
+BEGIN
+  IF (NEW.status = 'finished' AND (OLD.status != 'finished' OR OLD.home_score IS DISTINCT FROM NEW.home_score OR OLD.away_score IS DISTINCT FROM NEW.away_score)) THEN
+    UPDATE public.guesses
+    SET points_awarded = public.calculate_guess_points(home_guess, away_guess, NEW.home_score, NEW.away_score) * (CASE WHEN is_super = true THEN 2 ELSE 1 END)
+    WHERE match_id = NEW.id;
+
+    FOR guess_record IN SELECT DISTINCT user_id FROM public.guesses WHERE match_id = NEW.id LOOP
+      PERFORM public.recalculate_user_points(guess_record.user_id);
+    END LOOP;
+  ELSIF (OLD.status = 'finished' AND NEW.status != 'finished') THEN
+    UPDATE public.guesses
+    SET points_awarded = null
+    WHERE match_id = NEW.id;
+
+    FOR guess_record IN SELECT DISTINCT user_id FROM public.guesses WHERE match_id = NEW.id LOOP
+      PERFORM public.recalculate_user_points(guess_record.user_id);
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- 13. Super Palpite: Atualizar RPC admin_recalculate_all_points para dobrar pontos se is_super = true
+CREATE OR REPLACE FUNCTION public.admin_recalculate_all_points()
+RETURNS text AS $$
+DECLARE
+  m record;
+  g record;
+  updated_count integer := 0;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true
+  ) THEN
+    RAISE EXCEPTION 'Acesso negado: apenas administradores podem executar esta função.';
+  END IF;
+
+  FOR m IN SELECT * FROM public.matches WHERE status = 'finished' AND home_score IS NOT NULL AND away_score IS NOT NULL LOOP
+    UPDATE public.guesses
+    SET points_awarded = public.calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score) * (CASE WHEN is_super = true THEN 2 ELSE 1 END)
+    WHERE match_id = m.id;
+    updated_count := updated_count + 1;
+  END LOOP;
+
+  FOR g IN SELECT DISTINCT user_id FROM public.guesses LOOP
+    PERFORM public.recalculate_user_points(g.user_id);
+  END LOOP;
+
+  RETURN 'Recálculo completo! ' || updated_count || ' jogos finalizados processados.';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- 14. Verificação final
 SELECT
   (SELECT COUNT(*) FROM public.matches)  AS total_jogos,
   (SELECT COUNT(*) FROM public.profiles) AS total_usuarios,

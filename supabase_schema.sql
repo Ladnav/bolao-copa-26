@@ -79,6 +79,7 @@ create table public.guesses (
   match_id bigint references public.matches(id) on delete cascade not null,
   home_guess integer not null,
   away_guess integer not null,
+  is_super boolean default false not null,
   points_awarded integer, -- Nulo até o jogo finalizar
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -234,6 +235,65 @@ end;
 $$ language plpgsql immutable;
 
 
+-- Função auxiliar para determinar a fase do Super Palpite
+create or replace function public.get_match_super_guess_stage(p_match_id bigint, p_round text)
+returns text as $$
+begin
+  if p_round = 'Fase de Grupos' then
+    if p_match_id between 1 and 24 then
+      return 'Grupo - Rodada 1';
+    elsif p_match_id between 25 and 48 then
+      return 'Grupo - Rodada 2';
+    else
+      return 'Grupo - Rodada 3';
+    end if;
+  elsif p_round in ('Disputa de 3º lugar', 'Final') then
+    -- Final e disputa de 3º lugar compartilham o mesmo super palpite estratégico
+    return 'Fase Final';
+  else
+    return p_round; -- 'Rodada de 32', 'Oitavas de Final', 'Quartas de Final', 'Semifinais'
+  end if;
+end;
+$$ language plpgsql immutable;
+
+
+-- Trigger para garantir limite de 1 super palpite por fase/rodada
+create or replace function public.tr_check_and_limit_super_guess()
+returns trigger as $$
+declare
+  v_new_stage text;
+begin
+  if new.is_super = true then
+    -- Obter a fase correspondente do jogo atual
+    select public.get_match_super_guess_stage(m.id, m.round)
+    into v_new_stage
+    from public.matches m
+    where m.id = new.match_id;
+
+    -- Desmarcar super palpite de qualquer outro jogo da mesma fase/rodada para esse mesmo usuário
+    update public.guesses g
+    set is_super = false
+    from public.matches m
+    where g.match_id = m.id
+      and g.user_id = new.user_id
+      and g.id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid)
+      and g.is_super = true
+      and public.get_match_super_guess_stage(m.id, m.round) = v_new_stage;
+  end if;
+  
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists check_and_limit_super_guess_trigger on public.guesses;
+create trigger check_and_limit_super_guess_trigger
+  before insert or update of is_super
+  on public.guesses
+  for each row
+  when (new.is_super = true)
+  execute function public.tr_check_and_limit_super_guess();
+
+
 -- Função para Recalcular Pontos Acumulados de um Usuário
 create or replace function public.recalculate_user_points(p_user_id uuid)
 returns void as $$
@@ -241,8 +301,8 @@ begin
   update public.profiles
   set
     total_points       = coalesce((select sum(points_awarded) from public.guesses where user_id = p_user_id and points_awarded is not null), 0),
-    exact_scores_count = coalesce((select count(*)            from public.guesses where user_id = p_user_id and points_awarded = 10), 0),
-    pts7_count         = coalesce((select count(*)            from public.guesses where user_id = p_user_id and points_awarded = 7), 0)
+    exact_scores_count = coalesce((select count(*)            from public.guesses where user_id = p_user_id and (points_awarded = 10 or (is_super = true and points_awarded = 20))), 0),
+    pts7_count         = coalesce((select count(*)            from public.guesses where user_id = p_user_id and (points_awarded = 7 or (is_super = true and points_awarded = 14))), 0)
   where id = p_user_id;
 end;
 $$ language plpgsql security definer;
@@ -257,9 +317,9 @@ begin
   -- Caso o jogo passe para finalizado (finished) ou seja atualizado enquanto finalizado
   if (new.status = 'finished' and (old.status != 'finished' or old.home_score is distinct from new.home_score or old.away_score is distinct from new.away_score)) then
 
-    -- Atualiza pontos de todos os palpites desse jogo
+    -- Atualiza pontos de todos os palpites desse jogo, dobrando se for super palpite
     update public.guesses
-    set points_awarded = calculate_guess_points(home_guess, away_guess, new.home_score, new.away_score)
+    set points_awarded = calculate_guess_points(home_guess, away_guess, new.home_score, new.away_score) * (case when is_super = true then 2 else 1 end)
     where match_id = new.id;
 
     -- Recalcula os pontos dos usuários afetados
@@ -313,7 +373,7 @@ begin
   -- Para cada jogo finalizado, recalcular os pontos de todos os palpites
   for m in select * from public.matches where status = 'finished' and home_score is not null and away_score is not null loop
     update public.guesses
-    set points_awarded = calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score)
+    set points_awarded = calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score) * (case when is_super = true then 2 else 1 end)
     where match_id = m.id;
     updated_count := updated_count + 1;
   end loop;

@@ -58,6 +58,7 @@ export default function Dashboard({ user, profile, showToast }) {
             home_guess: g.home_guess !== null ? String(g.home_guess) : '',
             away_guess: g.away_guess !== null ? String(g.away_guess) : '',
             points_awarded: g.points_awarded,
+            is_super: g.is_super || false,
             isSaved: true
           };
         });
@@ -101,6 +102,7 @@ export default function Dashboard({ user, profile, showToast }) {
           match_id: matchId,
           home_guess: parseInt(guess.home_guess),
           away_guess: parseInt(guess.away_guess),
+          is_super: guess.is_super || false,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,match_id'
@@ -140,6 +142,78 @@ export default function Dashboard({ user, profile, showToast }) {
     }
   };
 
+  const toggleSuperGuess = async (matchId) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match) return;
+
+    if (isGuessClosed(match)) {
+      showToast('Prazo encerrado para palpites neste jogo!', 'error');
+      return;
+    }
+
+    const guess = userGuesses[matchId];
+    if (!guess || guess.home_guess === '' || guess.away_guess === '') {
+      showToast('Por favor, digite seu palpite antes de marcá-lo como Super Palpite! ⭐', 'error');
+      return;
+    }
+
+    if (!guess.isSaved) {
+      showToast('Por favor, salve seu palpite antes de marcá-lo como Super Palpite! ⭐', 'error');
+      return;
+    }
+
+    const newSuperState = !guess.is_super;
+    
+    if (newSuperState) {
+      const stageName = match.round === 'Fase de Grupos'
+        ? (matchId <= 24 ? 'Rodada 1 dos Grupos' : matchId <= 48 ? 'Rodada 2 dos Grupos' : 'Rodada 3 dos Grupos')
+        : (match.round === 'Disputa de 3º lugar' || match.round === 'Final' ? 'Fase Final' : match.round);
+      
+      const confirmed = window.confirm(
+        `⭐ Definir esta partida como seu Super Palpite da ${stageName}?\n\n` +
+        `Isso dobrará seus pontos se você pontuar nesta partida, e desmarcará qualquer outro Super Palpite ativo na mesma rodada.`
+      );
+      if (!confirmed) return;
+    }
+
+    setSavingId(matchId);
+    try {
+      const { data, error } = await supabase
+        .from('guesses')
+        .upsert({
+          user_id: user.id,
+          match_id: matchId,
+          home_guess: parseInt(guess.home_guess),
+          away_guess: parseInt(guess.away_guess),
+          is_super: newSuperState,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,match_id'
+        })
+        .select();
+
+      if (error) {
+        if (error.message?.includes('violates row-level security')) {
+          throw new Error('Prazo encerrado ou sem permissão para palpitar neste jogo.');
+        }
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Erro ao salvar o Super Palpite. O prazo limite pode ter expirado.');
+      }
+
+      // Recarrega todos os palpites para sincronizar e tirar estrelas anteriores
+      await fetchMatchesAndGuesses();
+      showToast(newSuperState ? 'Super Palpite ativado! ⭐' : 'Super Palpite removido! 🌟', 'success');
+    } catch (err) {
+      console.error('Erro ao alternar Super Palpite:', err);
+      showToast('Erro: ' + (err.message || 'Sem permissão'), 'error');
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const startEditing = (matchId) => {
     setEditingMatches(prev => new Set(prev).add(matchId));
   };
@@ -156,6 +230,7 @@ export default function Dashboard({ user, profile, showToast }) {
           home_guess,
           away_guess,
           points_awarded,
+          is_super,
           user_id,
           profiles (
             username
@@ -309,17 +384,32 @@ export default function Dashboard({ user, profile, showToast }) {
             return (
               <div
                 key={match.id}
-                className={`match-card glass-panel ${match.status === 'finished' ? 'finished' : ''}`}
+                className={`match-card glass-panel ${match.status === 'finished' ? 'finished' : ''} ${guess.is_super ? 'super-guess-card' : ''}`}
               >
                 {/* Header do Jogo */}
                 <div className="match-header">
                   <span className="match-badge">
                     {match.round} {match.group_name ? `• Grupo ${match.group_name}` : ''}
                   </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
-                    <Calendar size={13} />
-                    {formatDate(match.match_date)}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {guess.is_super && guessClosed && (
+                      <span className="super-badge">⭐ Super</span>
+                    )}
+                    {user && !guessClosed && (
+                      <button
+                        className={`btn-star ${guess.is_super ? 'active' : ''}`}
+                        onClick={() => toggleSuperGuess(match.id)}
+                        disabled={savingId === match.id}
+                        title={guess.is_super ? "Remover Super Palpite" : "Marcar como Super Palpite (Dobro de Pontos!)"}
+                      >
+                        ⭐
+                      </button>
+                    )}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+                      <Calendar size={13} />
+                      {formatDate(match.match_date)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Times e Placar Oficial */}
@@ -446,13 +536,24 @@ export default function Dashboard({ user, profile, showToast }) {
                         />
 
                         {match.status === 'finished' && guess.points_awarded !== null && (
-                          <div className="guess-result-badge" style={{ marginLeft: '10px' }}>
-                            <span className="points-text">+{guess.points_awarded} pts</span>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                              {guess.points_awarded === 10 ? '⭐ Exato!' :
-                               guess.points_awarded === 7 ? '🎯 Saldo' :
-                               guess.points_awarded === 5 ? '✅ Venc+Gols' :
-                               guess.points_awarded === 3 ? '👍 Vencedor' : '❌ Zerou'}
+                          <div 
+                            className="guess-result-badge" 
+                            style={{ 
+                              marginLeft: '10px',
+                              background: guess.is_super ? 'linear-gradient(135deg, var(--accent-gold) 0%, #d97706 100%)' : 'rgba(16, 185, 129, 0.15)',
+                              borderColor: guess.is_super ? 'var(--accent-gold)' : 'rgba(16, 185, 129, 0.3)',
+                              color: guess.is_super ? '#000' : 'inherit'
+                            }}
+                          >
+                            <span className="points-text" style={{ color: guess.is_super ? '#000' : 'var(--accent-green)', fontWeight: '800' }}>
+                              +{guess.points_awarded} pts {guess.is_super ? '⭐' : ''}
+                            </span>
+                            <span style={{ fontSize: '0.65rem', color: guess.is_super ? 'rgba(0,0,0,0.8)' : 'var(--text-muted)', fontWeight: guess.is_super ? '700' : 'normal' }}>
+                              {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
+                               guess.points_awarded === 14 || guess.points_awarded === 7 ? '🎯 Saldo' :
+                               guess.points_awarded === 10 || guess.points_awarded === 5 ? '✅ Venc+Gols' :
+                               guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : 
+                               guess.points_awarded === 2 || guess.points_awarded === 1 ? '🤝 Empate' : '❌ Zerou'}
                             </span>
                           </div>
                         )}
@@ -520,23 +621,24 @@ export default function Dashboard({ user, profile, showToast }) {
                         <div className="avatar-placeholder" style={{ width: '26px', height: '26px', fontSize: '0.7rem', flexShrink: 0 }}>
                           {(g.profiles?.username || 'U')[0].toUpperCase()}
                         </div>
-                        <span className="bet-user">
-                          @{g.profiles?.username || 'Usuário'}
-                          {isSelf && <span style={{ fontSize: '0.7rem', color: 'var(--accent-green)', marginLeft: '4px' }}>(você)</span>}
+                        <span className="bet-user" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>@{g.profiles?.username || 'Usuário'}</span>
+                          {isSelf && <span style={{ fontSize: '0.7rem', color: 'var(--accent-green)' }}>(você)</span>}
+                          {g.is_super && <span style={{ color: 'var(--accent-gold)' }} title="Super Palpite">⭐</span>}
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <span className="bet-score">{g.home_guess} x {g.away_guess}</span>
                         {modalMatch.status === 'finished' && g.points_awarded !== null && (
                           <span style={{
-                            color: g.points_awarded === 10 ? 'var(--accent-gold)' : g.points_awarded >= 5 ? 'var(--accent-green)' : 'var(--text-secondary)',
+                            color: g.is_super ? '#000' : (g.points_awarded === 10 ? 'var(--accent-gold)' : g.points_awarded >= 5 ? 'var(--accent-green)' : 'var(--text-secondary)'),
                             fontWeight: '700',
                             fontSize: '0.85rem',
-                            background: g.points_awarded === 10 ? 'rgba(245,158,11,0.15)' : g.points_awarded >= 5 ? 'var(--accent-green-glow)' : 'transparent',
+                            background: g.is_super ? 'linear-gradient(135deg, var(--accent-gold) 0%, #d97706 100%)' : (g.points_awarded === 10 ? 'rgba(245,158,11,0.15)' : g.points_awarded >= 5 ? 'var(--accent-green-glow)' : 'transparent'),
                             padding: '2px 6px',
                             borderRadius: '4px'
                           }}>
-                            +{g.points_awarded} pts
+                            +{g.points_awarded} pts {g.is_super ? '⭐' : ''}
                           </span>
                         )}
                       </div>
