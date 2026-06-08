@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { generateMatches } from '../data/matchesSeed';
-import { Database, Save, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+import { generateKnockoutMatches } from '../data/knockoutSeed';
+import { Database, Save, RefreshCw, AlertTriangle, Clock, Pencil, Calendar } from 'lucide-react';
 
 const renderFlag = (flag) => {
   if (!flag) return <span style={{ fontSize: '1.5rem' }}>🏳️</span>;
@@ -29,6 +30,7 @@ export default function Admin({ profile, showToast }) {
   const [editScores, setEditScores] = useState({});
   const [savingId, setSavingId] = useState(null);
   const [expandedDeadline, setExpandedDeadline] = useState(null);
+  const [expandedEditTeams, setExpandedEditTeams] = useState(null);
 
   useEffect(() => {
     fetchMatches();
@@ -46,14 +48,19 @@ export default function Admin({ profile, showToast }) {
       if (error) throw error;
       setMatches(data || []);
 
-      // Inicializar o estado de edição com os placares atuais
+      // Inicializar o estado de edição com os placares atuais e detalhes do confronto
       const editMap = {};
       data?.forEach(m => {
         editMap[m.id] = {
           home_score: m.home_score !== null ? String(m.home_score) : '',
           away_score: m.away_score !== null ? String(m.away_score) : '',
           status: m.status || 'scheduled',
-          guess_deadline: m.guess_deadline || ''
+          guess_deadline: m.guess_deadline || '',
+          home_team: m.home_team || '',
+          away_team: m.away_team || '',
+          home_team_flag: m.home_team_flag || '',
+          away_team_flag: m.away_team_flag || '',
+          match_date: m.match_date || ''
         };
       });
       setEditScores(editMap);
@@ -109,6 +116,41 @@ export default function Admin({ profile, showToast }) {
     }
   };
 
+  const seedKnockoutMatches = async () => {
+    if (!window.confirm('Tem certeza de que deseja semear os 32 jogos do mata-mata no banco de dados?')) return;
+
+    setLoading(true);
+    try {
+      // 1. Verificar se já há jogos de mata-mata inseridos (IDs >= 73)
+      const { count, error: countError } = await supabase
+        .from('matches')
+        .select('*', { count: 'exact', head: true })
+        .gte('id', 73);
+
+      if (countError) throw countError;
+
+      if (count > 0) {
+        throw new Error('Os jogos do mata-mata já foram semeados!');
+      }
+
+      // 2. Gerar e inserir jogos
+      const seedData = generateKnockoutMatches();
+      const { error: insertError } = await supabase
+        .from('matches')
+        .insert(seedData);
+
+      if (insertError) throw insertError;
+
+      showToast('Semeação de jogos concluída! 32 partidas do Mata-Mata criadas.', 'success');
+      fetchMatches();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao semear mata-mata: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateMatchResult = async (matchId) => {
     const edit = editScores[matchId];
     const match = matches.find(m => m.id === matchId);
@@ -141,13 +183,24 @@ export default function Admin({ profile, showToast }) {
         deadlineValue = new Date(edit.guess_deadline).toISOString();
       }
 
+      // Processar data da partida
+      let matchDateValue = match.match_date;
+      if (edit.match_date) {
+        matchDateValue = new Date(edit.match_date).toISOString();
+      }
+
       const { error } = await supabase
         .from('matches')
         .update({
           home_score: hScore,
           away_score: aScore,
           status: status,
-          guess_deadline: deadlineValue
+          guess_deadline: deadlineValue,
+          home_team: edit.home_team,
+          away_team: edit.away_team,
+          home_team_flag: edit.home_team_flag,
+          away_team_flag: edit.away_team_flag,
+          match_date: matchDateValue
         })
         .eq('id', matchId);
 
@@ -156,7 +209,18 @@ export default function Admin({ profile, showToast }) {
 
       // Atualiza a lista local
       setMatches(prev =>
-        prev.map(m => m.id === matchId ? { ...m, home_score: hScore, away_score: aScore, status, guess_deadline: deadlineValue } : m)
+        prev.map(m => m.id === matchId ? {
+          ...m,
+          home_score: hScore,
+          away_score: aScore,
+          status,
+          guess_deadline: deadlineValue,
+          home_team: edit.home_team,
+          away_team: edit.away_team,
+          home_team_flag: edit.home_team_flag,
+          away_team_flag: edit.away_team_flag,
+          match_date: matchDateValue
+        } : m)
       );
     } catch (err) {
       console.error(err);
@@ -216,6 +280,13 @@ export default function Admin({ profile, showToast }) {
           </button>
           <button
             className="btn-primary"
+            style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 15px rgba(245,158,11,0.3)' }}
+            onClick={seedKnockoutMatches}
+          >
+            Semear Mata-Mata
+          </button>
+          <button
+            className="btn-primary"
             style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)', boxShadow: '0 4px 15px rgba(124,58,237,0.3)' }}
             onClick={recalculateAllPoints}
             disabled={recalcLoading}
@@ -253,9 +324,20 @@ export default function Admin({ profile, showToast }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {matches.map(match => {
-            const edit = editScores[match.id] || { home_score: '', away_score: '', status: 'scheduled', guess_deadline: '' };
+            const edit = editScores[match.id] || {
+              home_score: '',
+              away_score: '',
+              status: 'scheduled',
+              guess_deadline: '',
+              home_team: '',
+              away_team: '',
+              home_team_flag: '',
+              away_team_flag: '',
+              match_date: ''
+            };
             const isFinished = match.status === 'finished';
             const showDeadline = expandedDeadline === match.id;
+            const showEditTeams = expandedEditTeams === match.id;
 
             return (
               <div key={match.id} className={`match-card glass-panel admin-card ${isFinished ? 'finished' : ''}`}>
@@ -319,12 +401,29 @@ export default function Admin({ profile, showToast }) {
                   {/* Toggle Prazo de Palpite */}
                   <button
                     className="nav-button"
-                    onClick={() => setExpandedDeadline(showDeadline ? null : match.id)}
+                    onClick={() => {
+                      setExpandedDeadline(showDeadline ? null : match.id);
+                      setExpandedEditTeams(null);
+                    }}
                     style={{ fontSize: '0.78rem', padding: '6px 10px', border: '1px solid var(--card-border)', gap: '4px' }}
                     title="Definir prazo de palpite"
                   >
                     <Clock size={12} />
                     {match.guess_deadline ? 'Prazo definido ✓' : 'Definir prazo'}
+                  </button>
+
+                  {/* Toggle Ajustar Confronto / Equipes */}
+                  <button
+                    className="nav-button"
+                    onClick={() => {
+                      setExpandedEditTeams(showEditTeams ? null : match.id);
+                      setExpandedDeadline(null);
+                    }}
+                    style={{ fontSize: '0.78rem', padding: '6px 10px', border: '1px solid var(--card-border)', gap: '4px' }}
+                    title="Ajustar Equipes e Data"
+                  >
+                    <Pencil size={12} />
+                    Ajustar Confronto
                   </button>
 
                   <button
@@ -354,6 +453,89 @@ export default function Admin({ profile, showToast }) {
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       Dica: Para fechar palpites 1 dia antes do primeiro jogo da rodada, defina a mesma data/hora para todos os jogos do grupo.
                     </p>
+                  </div>
+                )}
+
+                {/* Painel expandido de ajuste de confronto */}
+                {showEditTeams && (
+                  <div style={{ marginTop: '10px', padding: '15px', background: 'rgba(245,158,11,0.06)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', marginBottom: '10px', fontWeight: 'bold' }}>
+                      ⚙️ Ajustar Equipes, Bandeiras e Data/Hora:
+                    </h4>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                      {/* Mandante */}
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          Nome do Mandante:
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={edit.home_team}
+                          onChange={(e) => handleScoreChange(match.id, 'home_team', e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          placeholder="Ex: Brasil"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          Bandeira do Mandante (Emoji ou URL):
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={edit.home_team_flag}
+                          onChange={(e) => handleScoreChange(match.id, 'home_team_flag', e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          placeholder="Ex: 🇧🇷 ou URL"
+                        />
+                      </div>
+
+                      {/* Visitante */}
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          Nome do Visitante:
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={edit.away_team}
+                          onChange={(e) => handleScoreChange(match.id, 'away_team', e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          placeholder="Ex: Argentina"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          Bandeira do Visitante (Emoji ou URL):
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={edit.away_team_flag}
+                          onChange={(e) => handleScoreChange(match.id, 'away_team_flag', e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          placeholder="Ex: 🇦🇷 ou URL"
+                        />
+                      </div>
+
+                      {/* Data do Jogo */}
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                          📅 Data e Hora da Partida:
+                        </label>
+                        <input
+                          type="datetime-local"
+                          className="form-input"
+                          value={formatDateTimeLocal(edit.match_date)}
+                          onChange={(e) => handleScoreChange(match.id, 'match_date', e.target.value)}
+                          style={{ fontSize: '0.85rem', padding: '8px', width: 'auto' }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
