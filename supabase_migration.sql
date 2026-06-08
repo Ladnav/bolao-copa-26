@@ -208,6 +208,9 @@ END $$;
 
 
 -- 7. Atualizar a função que recalcula pontos do usuário para incluir pts7_count
+DROP FUNCTION IF EXISTS public.recalculate_user_points(uuid);
+DROP FUNCTION IF EXISTS public.recalculate_user_points(p_user_id uuid);
+
 CREATE OR REPLACE FUNCTION public.recalculate_user_points(p_user_id uuid)
 RETURNS void AS $$
 BEGIN
