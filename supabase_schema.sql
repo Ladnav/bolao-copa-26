@@ -96,7 +96,7 @@ create policy "Ver palpites próprios ou de outros pós-início"
     auth.uid() = user_id
     or exists (
       select 1 from public.matches
-      where matches.id = match_id
+      where matches.id = guesses.match_id
       and matches.match_date <= now()
     )
   );
@@ -109,7 +109,7 @@ create policy "Inserir próprios palpites antes do prazo"
     auth.uid() = user_id
     and exists (
       select 1 from public.matches
-      where matches.id = match_id
+      where matches.id = guesses.match_id
       and coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );
@@ -121,7 +121,7 @@ create policy "Atualizar próprios palpites antes do prazo"
     auth.uid() = user_id
     and exists (
       select 1 from public.matches
-      where matches.id = match_id
+      where matches.id = guesses.match_id
       and coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   )
@@ -129,7 +129,7 @@ create policy "Atualizar próprios palpites antes do prazo"
     auth.uid() = user_id
     and exists (
       select 1 from public.matches
-      where matches.id = match_id
+      where matches.id = guesses.match_id
       and coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );
@@ -141,7 +141,7 @@ create policy "Deletar próprios palpites antes do prazo"
     auth.uid() = user_id
     and exists (
       select 1 from public.matches
-      where matches.id = match_id
+      where matches.id = guesses.match_id
       and coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );

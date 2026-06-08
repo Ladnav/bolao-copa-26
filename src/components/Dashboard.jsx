@@ -92,7 +92,7 @@ export default function Dashboard({ user, profile, showToast }) {
 
     setSavingId(matchId);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('guesses')
         .upsert({
           user_id: user.id,
@@ -102,7 +102,8 @@ export default function Dashboard({ user, profile, showToast }) {
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,match_id'
-        });
+        })
+        .select();
 
       if (error) {
         // Erros comuns com mensagens amigáveis
@@ -113,6 +114,10 @@ export default function Dashboard({ user, profile, showToast }) {
           throw new Error('Seu perfil não foi encontrado. Faça logout e login novamente.');
         }
         throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Não foi possível salvar o palpite. O prazo limite pode ter expirado ou o jogo já começou.');
       }
 
       // Sai do modo edição após salvar

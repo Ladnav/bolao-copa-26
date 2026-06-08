@@ -41,14 +41,26 @@ END $$;
 
 
 -- 3. Atualizar RLS de palpites para usar guess_deadline
--- (Recria as políticas de INSERT/UPDATE/DELETE com a nova lógica)
+-- (Recria as políticas de SELECT/INSERT/UPDATE/DELETE com a nova lógica)
 
 DROP POLICY IF EXISTS "Inserir próprios palpites antes do jogo começar" ON public.guesses;
 DROP POLICY IF EXISTS "Atualizar próprios palpites antes do jogo começar" ON public.guesses;
 DROP POLICY IF EXISTS "Deletar próprios palpites antes do jogo começar" ON public.guesses;
+DROP POLICY IF EXISTS "Ver palpites próprios ou de outros pós-início" ON public.guesses;
 DROP POLICY IF EXISTS "Inserir próprios palpites antes do prazo" ON public.guesses;
 DROP POLICY IF EXISTS "Atualizar próprios palpites antes do prazo" ON public.guesses;
 DROP POLICY IF EXISTS "Deletar próprios palpites antes do prazo" ON public.guesses;
+
+CREATE POLICY "Ver palpites próprios ou de outros pós-início"
+  ON public.guesses FOR SELECT
+  USING (
+    auth.uid() = user_id
+    OR EXISTS (
+      SELECT 1 FROM public.matches
+      WHERE matches.id = guesses.match_id
+      AND matches.match_date <= now()
+    )
+  );
 
 CREATE POLICY "Inserir próprios palpites antes do prazo"
   ON public.guesses FOR INSERT
@@ -56,7 +68,7 @@ CREATE POLICY "Inserir próprios palpites antes do prazo"
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1 FROM public.matches
-      WHERE matches.id = match_id
+      WHERE matches.id = guesses.match_id
       AND coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );
@@ -67,7 +79,7 @@ CREATE POLICY "Atualizar próprios palpites antes do prazo"
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1 FROM public.matches
-      WHERE matches.id = match_id
+      WHERE matches.id = guesses.match_id
       AND coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   )
@@ -75,7 +87,7 @@ CREATE POLICY "Atualizar próprios palpites antes do prazo"
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1 FROM public.matches
-      WHERE matches.id = match_id
+      WHERE matches.id = guesses.match_id
       AND coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );
@@ -86,7 +98,7 @@ CREATE POLICY "Deletar próprios palpites antes do prazo"
     auth.uid() = user_id
     AND EXISTS (
       SELECT 1 FROM public.matches
-      WHERE matches.id = match_id
+      WHERE matches.id = guesses.match_id
       AND coalesce(matches.guess_deadline, matches.match_date) > now()
     )
   );
