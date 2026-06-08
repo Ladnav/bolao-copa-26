@@ -22,6 +22,7 @@ create table public.profiles (
   avatar_url text,
   total_points integer default 0 not null,
   exact_scores_count integer default 0 not null,
+  pts7_count integer default 0 not null,
   is_admin boolean default false not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -234,22 +235,15 @@ $$ language plpgsql immutable;
 
 
 -- Função para Recalcular Pontos Acumulados de um Usuário
-create or replace function recalculate_user_points(u_id uuid)
+create or replace function public.recalculate_user_points(p_user_id uuid)
 returns void as $$
-declare
-  t_points integer := 0;
-  e_count integer := 0;
 begin
-  select coalesce(sum(points_awarded), 0),
-         coalesce(count(case when points_awarded = 10 then 1 end), 0)
-  into t_points, e_count
-  from public.guesses
-  where user_id = u_id and points_awarded is not null;
-
   update public.profiles
-  set total_points = t_points,
-      exact_scores_count = e_count
-  where id = u_id;
+  set
+    total_points       = coalesce((select sum(points_awarded) from public.guesses where user_id = p_user_id and points_awarded is not null), 0),
+    exact_scores_count = coalesce((select count(*)            from public.guesses where user_id = p_user_id and points_awarded = 10), 0),
+    pts7_count         = coalesce((select count(*)            from public.guesses where user_id = p_user_id and points_awarded = 7), 0)
+  where id = p_user_id;
 end;
 $$ language plpgsql security definer;
 

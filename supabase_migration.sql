@@ -190,7 +190,38 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 6. Verificação final
+-- 6. Adicionar coluna pts7_count nos perfis para critério de desempate se não existir
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'profiles'
+    AND column_name = 'pts7_count'
+  ) THEN
+    ALTER TABLE public.profiles ADD COLUMN pts7_count integer NOT NULL DEFAULT 0;
+    RAISE NOTICE 'Coluna pts7_count adicionada com sucesso.';
+  ELSE
+    RAISE NOTICE 'Coluna pts7_count já existe, pulando.';
+  END IF;
+END $$;
+
+
+-- 7. Atualizar a função que recalcula pontos do usuário para incluir pts7_count
+CREATE OR REPLACE FUNCTION public.recalculate_user_points(p_user_id uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.profiles
+  SET
+    total_points       = COALESCE((SELECT SUM(points_awarded) FROM public.guesses WHERE user_id = p_user_id AND points_awarded IS NOT NULL), 0),
+    exact_scores_count = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND points_awarded = 10), 0),
+    pts7_count         = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND points_awarded = 7), 0)
+  WHERE id = p_user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- 8. Verificação final
 SELECT
   (SELECT COUNT(*) FROM public.matches)  AS total_jogos,
   (SELECT COUNT(*) FROM public.profiles) AS total_usuarios,
