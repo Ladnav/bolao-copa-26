@@ -104,13 +104,23 @@ export default function Dashboard({ user, showToast }) {
           onConflict: 'user_id,match_id'
         });
 
-      if (error) throw error;
+      if (error) {
+        // Erros comuns com mensagens amigáveis
+        if (error.message?.includes('violates row-level security')) {
+          throw new Error('Prazo encerrado ou sem permissão para palpitar neste jogo.');
+        }
+        if (error.message?.includes('violates foreign key')) {
+          throw new Error('Seu perfil não foi encontrado. Faça logout e login novamente.');
+        }
+        throw error;
+      }
+
       // Sai do modo edição após salvar
       setEditingMatches(prev => { const s = new Set(prev); s.delete(matchId); return s; });
       showToast('Palpite salvo! ✅', 'success');
     } catch (err) {
-      console.error(err);
-      showToast('Erro ao salvar palpite: ' + (err.message || 'Sem permissão'), 'error');
+      console.error('Erro ao salvar palpite:', err);
+      showToast('Erro: ' + (err.message || 'Sem permissão'), 'error');
     } finally {
       setSavingId(null);
     }
