@@ -626,6 +626,14 @@ button, input, select {
   border-color: var(--accent-green);
 }
 
+select.form-input option,
+select.select-filter option,
+.select-filter option,
+.form-input option {
+  background-color: #1f2937 !important;
+  color: #ffffff !important;
+}
+
 /* Modal / Comparative bets view */
 .modal-overlay {
   position: fixed;
