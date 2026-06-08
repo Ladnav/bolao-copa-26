@@ -1,7 +1,7 @@
 // Dados de Semente (Seed) das partidas da Fase de Grupos da Copa do Mundo 2026
 // Total: 12 grupos (A a L), 4 seleções por grupo, 6 jogos por grupo = 72 jogos.
 
-const flagCodes = {
+export const flagCodes = {
   'México': 'mx',
   'África do Sul': 'za',
   'Coreia do Sul': 'kr',
@@ -52,7 +52,7 @@ const flagCodes = {
   'Panamá': 'pa'
 };
 
-const getFlagUrl = (teamName) => {
+export const getFlagUrl = (teamName) => {
   const code = flagCodes[teamName];
   if (code) {
     return `https://flagcdn.com/w80/${code}.png`;

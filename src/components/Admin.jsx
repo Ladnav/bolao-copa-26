@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { generateMatches } from '../data/matchesSeed';
+import { generateMatches, flagCodes, getFlagUrl } from '../data/matchesSeed';
 import { generateKnockoutMatches } from '../data/knockoutSeed';
 import { Database, Save, RefreshCw, AlertTriangle, Clock, Pencil, Calendar } from 'lucide-react';
+
+const countriesList = Object.keys(flagCodes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
 const renderFlag = (flag) => {
   if (!flag) return <span style={{ fontSize: '1.5rem' }}>🏳️</span>;
@@ -463,11 +465,32 @@ export default function Admin({ profile, showToast }) {
                       ⚙️ Ajustar Equipes, Bandeiras e Data/Hora:
                     </h4>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                       {/* Mandante */}
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          Nome do Mandante:
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                          Escolher Mandante (Lista):
+                        </label>
+                        <select
+                          className="form-input"
+                          value={countriesList.includes(edit.home_team) ? edit.home_team : ''}
+                          onChange={(e) => {
+                            const selectedTeam = e.target.value;
+                            if (selectedTeam) {
+                              handleScoreChange(match.id, 'home_team', selectedTeam);
+                              handleScoreChange(match.id, 'home_team_flag', getFlagUrl(selectedTeam));
+                            }
+                          }}
+                          style={{ fontSize: '0.85rem', padding: '8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                        >
+                          <option value="">-- Personalizado / Placeholder --</option>
+                          {countriesList.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Ou digitar nome do Mandante:
                         </label>
                         <input
                           type="text"
@@ -479,8 +502,8 @@ export default function Admin({ profile, showToast }) {
                         />
                       </div>
                       
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
                           Bandeira do Mandante (Emoji ou URL):
                         </label>
                         <input
@@ -488,15 +511,36 @@ export default function Admin({ profile, showToast }) {
                           className="form-input"
                           value={edit.home_team_flag}
                           onChange={(e) => handleScoreChange(match.id, 'home_team_flag', e.target.value)}
-                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          style={{ fontSize: '0.85rem', padding: '8px', marginTop: '33px' }}
                           placeholder="Ex: 🇧🇷 ou URL"
                         />
                       </div>
 
                       {/* Visitante */}
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          Nome do Visitante:
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                          Escolher Visitante (Lista):
+                        </label>
+                        <select
+                          className="form-input"
+                          value={countriesList.includes(edit.away_team) ? edit.away_team : ''}
+                          onChange={(e) => {
+                            const selectedTeam = e.target.value;
+                            if (selectedTeam) {
+                              handleScoreChange(match.id, 'away_team', selectedTeam);
+                              handleScoreChange(match.id, 'away_team_flag', getFlagUrl(selectedTeam));
+                            }
+                          }}
+                          style={{ fontSize: '0.85rem', padding: '8px', background: 'rgba(255,255,255,0.05)', color: '#fff' }}
+                        >
+                          <option value="">-- Personalizado / Placeholder --</option>
+                          {countriesList.map(country => (
+                            <option key={country} value={country}>{country}</option>
+                          ))}
+                        </select>
+
+                        <label style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          Ou digitar nome do Visitante:
                         </label>
                         <input
                           type="text"
@@ -508,8 +552,8 @@ export default function Admin({ profile, showToast }) {
                         />
                       </div>
                       
-                      <div>
-                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
                           Bandeira do Visitante (Emoji ou URL):
                         </label>
                         <input
@@ -517,7 +561,7 @@ export default function Admin({ profile, showToast }) {
                           className="form-input"
                           value={edit.away_team_flag}
                           onChange={(e) => handleScoreChange(match.id, 'away_team_flag', e.target.value)}
-                          style={{ fontSize: '0.85rem', padding: '8px' }}
+                          style={{ fontSize: '0.85rem', padding: '8px', marginTop: '33px' }}
                           placeholder="Ex: 🇦🇷 ou URL"
                         />
                       </div>

@@ -69,7 +69,7 @@ CREATE POLICY "Inserir próprios palpites antes do prazo"
     AND EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = guesses.match_id
-      AND coalesce(matches.guess_deadline, matches.match_date) > now()
+      AND coalesce(matches.guess_deadline, matches.match_date - INTERVAL '24 hours') > now()
     )
   );
 
@@ -80,7 +80,7 @@ CREATE POLICY "Atualizar próprios palpites antes do prazo"
     AND EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = guesses.match_id
-      AND coalesce(matches.guess_deadline, matches.match_date) > now()
+      AND coalesce(matches.guess_deadline, matches.match_date - INTERVAL '24 hours') > now()
     )
   )
   WITH CHECK (
@@ -88,7 +88,7 @@ CREATE POLICY "Atualizar próprios palpites antes do prazo"
     AND EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = guesses.match_id
-      AND coalesce(matches.guess_deadline, matches.match_date) > now()
+      AND coalesce(matches.guess_deadline, matches.match_date - INTERVAL '24 hours') > now()
     )
   );
 
@@ -99,7 +99,7 @@ CREATE POLICY "Deletar próprios palpites antes do prazo"
     AND EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = guesses.match_id
-      AND coalesce(matches.guess_deadline, matches.match_date) > now()
+      AND coalesce(matches.guess_deadline, matches.match_date - INTERVAL '24 hours') > now()
     )
   );
 

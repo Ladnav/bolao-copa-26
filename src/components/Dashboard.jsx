@@ -184,16 +184,25 @@ export default function Dashboard({ user, profile, showToast }) {
     });
   };
 
+  // Obtém a data limite real do palpite (guess_deadline ou match_date - 24 horas)
+  const getGuessDeadlineDate = (match) => {
+    if (match.guess_deadline) {
+      return new Date(match.guess_deadline);
+    }
+    // Subtrai 24 horas (24 * 60 * 60 * 1000 milissegundos) da data do jogo
+    const matchTime = new Date(match.match_date).getTime();
+    return new Date(matchTime - 24 * 60 * 60 * 1000);
+  };
+
   // Verifica se os palpites estão fechados para um jogo
-  // Usa guess_deadline se definido, senão usa match_date
   const isGuessClosed = (match) => {
-    const deadline = match.guess_deadline ? new Date(match.guess_deadline) : new Date(match.match_date);
+    const deadline = getGuessDeadlineDate(match);
     return deadline <= new Date();
   };
 
   // Formata o prazo de palpite de forma amigável
   const formatDeadline = (match) => {
-    const deadline = match.guess_deadline ? new Date(match.guess_deadline) : new Date(match.match_date);
+    const deadline = getGuessDeadlineDate(match);
     const now = new Date();
     const diff = deadline - now;
 
