@@ -57,7 +57,8 @@ export default function Dashboard({ user, profile, showToast }) {
           guessesMap[g.match_id] = {
             home_guess: g.home_guess !== null ? String(g.home_guess) : '',
             away_guess: g.away_guess !== null ? String(g.away_guess) : '',
-            points_awarded: g.points_awarded
+            points_awarded: g.points_awarded,
+            isSaved: true
           };
         });
         setUserGuesses(guessesMap);
@@ -78,7 +79,8 @@ export default function Dashboard({ user, profile, showToast }) {
         home_guess: '',
         away_guess: '',
         ...prev[matchId],
-        [team === 'home' ? 'home_guess' : 'away_guess']: numericVal
+        [team === 'home' ? 'home_guess' : 'away_guess']: numericVal,
+        isSaved: false
       }
     }));
   };
@@ -122,6 +124,13 @@ export default function Dashboard({ user, profile, showToast }) {
 
       // Sai do modo edição após salvar
       setEditingMatches(prev => { const s = new Set(prev); s.delete(matchId); return s; });
+      setUserGuesses(prev => ({
+        ...prev,
+        [matchId]: {
+          ...prev[matchId],
+          isSaved: true
+        }
+      }));
       showToast('Palpite salvo! ✅', 'success');
     } catch (err) {
       console.error('Erro ao salvar palpite:', err);
@@ -341,7 +350,7 @@ export default function Dashboard({ user, profile, showToast }) {
                     // Palpites abertos
                     <div>
                       {/* Se tem palpite salvo e não está editando: mostra card salvo */}
-                      {guess.home_guess !== '' && guess.away_guess !== '' && !editingMatches.has(match.id) ? (
+                      {guess.isSaved && !editingMatches.has(match.id) ? (
                         <div className="saved-guess-card">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <CheckCircle2 size={16} color="var(--accent-green)" />
