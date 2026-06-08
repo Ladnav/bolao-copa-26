@@ -59,6 +59,8 @@ export default function App() {
         .eq('id', userId)
         .single();
 
+      let profileData = data;
+
       if (error) {
         // PGRST116 = nenhuma linha encontrada (perfil não existe no banco)
         if (error.code === 'PGRST116') {
@@ -81,29 +83,52 @@ export default function App() {
               .select()
               .single();
             if (!createErr) {
-              setProfile(created);
+              profileData = created;
               showToast('Perfil recriado com sucesso! Bem-vindo de volta.', 'success');
             } else {
               console.error('Erro ao recriar perfil:', createErr.message);
               // Aguarda trigger e tenta novamente
-              setTimeout(async () => {
-                const { data: r } = await supabase
-                  .from('profiles').select('*').eq('id', userId).single();
-                if (r) setProfile(r);
-              }, 1500);
+              const retryRes = await new Promise((resolve) => {
+                setTimeout(async () => {
+                  const { data: r } = await supabase
+                    .from('profiles').select('*').eq('id', userId).single();
+                  resolve(r);
+                }, 1500);
+              });
+              profileData = retryRes;
             }
           }
         } else {
           // Outro erro: aguarda trigger e tenta novamente
           console.warn('Erro ao buscar perfil:', error.message);
-          setTimeout(async () => {
-            const { data: retryData } = await supabase
-              .from('profiles').select('*').eq('id', userId).single();
-            if (retryData) setProfile(retryData);
-          }, 1200);
+          const retryRes = await new Promise((resolve) => {
+            setTimeout(async () => {
+              const { data: r } = await supabase
+                .from('profiles').select('*').eq('id', userId).single();
+              resolve(r);
+            }, 1200);
+          });
+          profileData = retryRes;
         }
-      } else {
-        setProfile(data);
+      }
+
+      if (profileData) {
+        // Obter posição no ranking
+        let userRank = 0;
+        try {
+          const { data: rankList } = await supabase
+            .from('profiles')
+            .select('id')
+            .order('total_points', { ascending: false })
+            .order('exact_scores_count', { ascending: false })
+            .order('pts7_count', { ascending: false });
+          if (rankList) {
+            userRank = rankList.findIndex(r => r.id === userId) + 1;
+          }
+        } catch (rankErr) {
+          console.warn('Erro ao obter ranking:', rankErr);
+        }
+        setProfile({ ...profileData, rank: userRank });
       }
     } catch (err) {
       console.error(err);
@@ -223,6 +248,12 @@ export default function App() {
         </div>
 
         <div className="user-stats">
+          {profile?.rank > 0 && (
+            <div className="stat-item">
+              <span className="stat-value" style={{ color: 'var(--accent-blue)' }}>{profile.rank}º</span>
+              <span className="stat-label">Posição</span>
+            </div>
+          )}
           <div className="stat-item">
             <span className="stat-value text-gradient-gold">{profile?.total_points ?? 0}</span>
             <span className="stat-label">Meus Pontos</span>
@@ -244,7 +275,7 @@ export default function App() {
       {/* Conteúdo da Aba Ativa */}
       <main style={{ minHeight: '60vh' }}>
         {activeTab === 'dashboard' && (
-          <Dashboard user={user} showToast={showToast} />
+          <Dashboard user={user} profile={profile} showToast={showToast} />
         )}
         
         {activeTab === 'ranking' && (

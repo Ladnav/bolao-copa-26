@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trophy, Star, Activity, X, ChevronDown } from 'lucide-react';
+import { Trophy, Star, Activity, X, ChevronDown, Search } from 'lucide-react';
 
 const renderFlag = (flag) => {
   if (!flag) return <span>🏳️</span>;
@@ -27,6 +27,14 @@ export default function Ranking({ currentUser, showToast }) {
   const [detailUser, setDetailUser] = useState(null);
   const [detailGuesses, setDetailGuesses] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredLeaderboard = leaderboard.map((profile, index) => ({
+    ...profile,
+    rank: index + 1
+  })).filter(profile =>
+    profile.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     fetchLeaderboard();
@@ -127,6 +135,21 @@ export default function Ranking({ currentUser, showToast }) {
         </button>
       </div>
 
+      {/* Barra de Pesquisa */}
+      {!loading && leaderboard.length > 0 && (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+          <input
+            type="text"
+            className="form-input search-input"
+            placeholder="Buscar participante..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ paddingLeft: '38px', fontSize: '0.85rem', padding: '8px 12px' }}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
           Carregando ranking...
@@ -134,6 +157,10 @@ export default function Ranking({ currentUser, showToast }) {
       ) : leaderboard.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
           Nenhum participante cadastrado ainda.
+        </div>
+      ) : filteredLeaderboard.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
+          Nenhum participante encontrado com "{searchQuery}".
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -148,9 +175,9 @@ export default function Ranking({ currentUser, showToast }) {
               </tr>
             </thead>
             <tbody>
-              {leaderboard.map((profile, index) => {
+              {filteredLeaderboard.map((profile) => {
                 const isSelf = currentUser && profile.id === currentUser.id;
-                const position = index + 1;
+                const position = profile.rank;
                 let posClass = '';
                 if (position === 1) posClass = 'ranking-pos-1';
                 else if (position === 2) posClass = 'ranking-pos-2';

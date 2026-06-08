@@ -10,7 +10,7 @@ const renderFlag = (flag) => {
   return <span className="team-flag">{flag}</span>;
 };
 
-export default function Dashboard({ user, showToast }) {
+export default function Dashboard({ user, profile, showToast }) {
   const [matches, setMatches] = useState([]);
   const [userGuesses, setUserGuesses] = useState({});
   const [loading, setLoading] = useState(true);
@@ -262,6 +262,16 @@ export default function Dashboard({ user, showToast }) {
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '50px 0', color: 'var(--text-secondary)' }}>
           Carregando jogos do bolão...
+        </div>
+      ) : matches.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '50px 20px', maxWidth: '500px', margin: '40px auto' }} className="glass-panel">
+          <div style={{ fontSize: '3rem', marginBottom: '15px' }}>⚽</div>
+          <h3 style={{ fontSize: '1.3rem', marginBottom: '10px', color: '#fff', fontFamily: 'var(--font-title)' }}>Nenhum jogo cadastrado</h3>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
+            {profile?.is_admin
+              ? 'O banco de dados do bolão está vazio! Vá até a aba "Admin Panel" no menu superior para semear as partidas e dar o pontapé inicial.'
+              : 'O banco de dados do bolão está vazio! Peça ao administrador do bolão para semear as partidas da Copa do Mundo e dar o pontapé inicial.'}
+          </p>
         </div>
       ) : filteredMatches.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
