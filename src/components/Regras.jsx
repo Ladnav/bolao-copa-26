@@ -61,7 +61,6 @@ const rules = [
 const tiebreakers = [
   { icon: '🏅', label: 'Maior pontuação total' },
   { icon: '⭐', label: 'Maior quantidade de placares exatos (10 pts)' },
-  { icon: '🔤', label: 'Ordem alfabética do nome de usuário' },
 ];
 
 export default function Regras() {

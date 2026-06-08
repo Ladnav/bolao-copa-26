@@ -40,7 +40,7 @@ export default function Ranking({ currentUser, showToast }) {
         .select('*')
         .order('total_points', { ascending: false })
         .order('exact_scores_count', { ascending: false })
-        .order('username', { ascending: true });
+        .order('pts7_count', { ascending: false });
 
       if (error) throw error;
       setLeaderboard(data || []);
