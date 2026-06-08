@@ -51,6 +51,12 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile(user.id);
+    }
+  }, [activeTab]);
+
   const fetchProfile = async (userId) => {
     try {
       const { data, error } = await supabase
