@@ -413,12 +413,24 @@ export default function Dashboard({ user, profile, showToast }) {
         </div>
       </div>
 
+      {/* Link de Referência da Tabela GE */}
+      <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '10px', marginBottom: '5px', padding: '0 5px' }}>
+        <a 
+          href="https://ge.globo.com/futebol/copa-do-mundo/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ fontSize: '0.82rem', color: 'var(--accent-blue)', display: 'inline-flex', alignItems: 'center', gap: '5px', textDecoration: 'none', fontWeight: 'bold' }}
+        >
+          📊 Classificação e Tabela Oficial da Copa no GE 🔗
+        </a>
+      </div>
+
       {/* Painel de Status do Super Palpite */}
       {user && matches.length > 0 && (
         <div 
           className="super-status-panel glass-panel" 
           style={{ 
-            marginTop: '15px', 
+            marginTop: '10px', 
             padding: '12px 20px', 
             borderRadius: 'var(--radius-sm)', 
             border: '1px solid rgba(245, 158, 11, 0.25)', 
@@ -427,21 +439,11 @@ export default function Dashboard({ user, profile, showToast }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.2rem' }}>⭐</span>
-                <span style={{ fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.82rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                  Status dos Seus Super Palpites (Dobro de Pontos!):
-                </span>
-              </div>
-              <a 
-                href="https://ge.globo.com/futebol/copa-do-mundo/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ fontSize: '0.78rem', color: 'var(--accent-blue)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: 'bold' }}
-              >
-                📊 Tabela e Classificação GE 🔗
-              </a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>⭐</span>
+              <span style={{ fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.82rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                Status dos Seus Super Palpites (Dobro de Pontos!):
+              </span>
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {getSuperGuessesStatus().map(st => (
