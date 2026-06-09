@@ -26,6 +26,58 @@ export default function Dashboard({ user, profile, showToast }) {
   const [modalGuesses, setModalGuesses] = useState([]);
   const [loadingModal, setLoadingModal] = useState(false);
 
+  // Função para retornar quais super palpites estão ativos e em qual jogo para a fase selecionada
+  const getSuperGuessesStatus = () => {
+    if (!user) return [];
+
+    const stages = [];
+    if (roundFilter === 'Fase de Grupos') {
+      stages.push({ key: 'Grupo - Rodada 1', label: 'Rodada 1 (Grupos)', ids: [1, 24] });
+      stages.push({ key: 'Grupo - Rodada 2', label: 'Rodada 2 (Grupos)', ids: [25, 48] });
+      stages.push({ key: 'Grupo - Rodada 3', label: 'Rodada 3 (Grupos)', ids: [49, 72] });
+    } else if (roundFilter === 'Disputa de 3º lugar' || roundFilter === 'Final') {
+      stages.push({ key: 'Fase Final', label: 'Fase Final (3º Lugar ou Final)', ids: [103, 104] });
+    } else {
+      stages.push({ key: roundFilter, label: roundFilter, ids: null });
+    }
+
+    return stages.map(stage => {
+      let activeGuess = null;
+      let activeMatch = null;
+
+      Object.keys(userGuesses).forEach(matchIdStr => {
+        const matchId = parseInt(matchIdStr);
+        const g = userGuesses[matchId];
+        if (g?.is_super) {
+          const m = matches.find(item => item.id === matchId);
+          if (m) {
+            let matchesStage = false;
+            if (stage.ids) {
+              if (stage.key === 'Fase Final') {
+                matchesStage = (m.round === 'Final' || m.round === 'Disputa de 3º lugar');
+              } else {
+                matchesStage = m.round === 'Fase de Grupos' && m.id >= stage.ids[0] && m.id <= stage.ids[1];
+              }
+            } else {
+              matchesStage = m.round === stage.key;
+            }
+
+            if (matchesStage) {
+              activeGuess = g;
+              activeMatch = m;
+            }
+          }
+        }
+      });
+
+      return {
+        ...stage,
+        used: !!activeGuess,
+        match: activeMatch
+      };
+    });
+  };
+
   useEffect(() => {
     fetchMatchesAndGuesses();
   }, [user]);
@@ -170,8 +222,12 @@ export default function Dashboard({ user, profile, showToast }) {
         : (match.round === 'Disputa de 3º lugar' || match.round === 'Final' ? 'Fase Final' : match.round);
       
       const confirmed = window.confirm(
-        `⭐ Definir esta partida como seu Super Palpite da ${stageName}?\n\n` +
-        `Isso dobrará seus pontos se você pontuar nesta partida, e desmarcará qualquer outro Super Palpite ativo na mesma rodada.`
+        `⭐ ATIVAÇÃO DE SUPER PALPITE ⭐\n\n` +
+        `Deseja definir a partida [${match.home_team} x ${match.away_team}] como seu Super Palpite da ${stageName}?\n\n` +
+        `• REGRA: Você tem direito a exatamente 1 Super Palpite por rodada.\n` +
+        `• SUBSTITUIÇÃO: Se você já tiver ativado o Super Palpite em outra partida desta mesma rodada, ele será desativado automaticamente para ativar este no lugar.\n` +
+        `• PONTOS: Caso você pontue neste jogo, seus pontos serão DOBRADOS!\n\n` +
+        `Deseja confirmar e prosseguir?`
       );
       if (!confirmed) return;
     }
@@ -356,6 +412,58 @@ export default function Dashboard({ user, profile, showToast }) {
           </div>
         </div>
       </div>
+
+      {/* Painel de Status do Super Palpite */}
+      {user && matches.length > 0 && (
+        <div 
+          className="super-status-panel glass-panel" 
+          style={{ 
+            marginTop: '15px', 
+            padding: '12px 20px', 
+            borderRadius: 'var(--radius-sm)', 
+            border: '1px solid rgba(245, 158, 11, 0.25)', 
+            background: 'linear-gradient(90deg, rgba(20, 20, 30, 0.4) 0%, rgba(245, 158, 11, 0.03) 100%)',
+            marginBottom: '15px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>⭐</span>
+              <span style={{ fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.82rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                Status dos Seus Super Palpites (Dobro de Pontos!):
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {getSuperGuessesStatus().map(st => (
+                <div 
+                  key={st.key} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    fontSize: '0.8rem', 
+                    background: 'rgba(255,255,255,0.03)', 
+                    padding: '4px 12px', 
+                    borderRadius: '20px', 
+                    border: '1px solid rgba(255,255,255,0.05)' 
+                  }}
+                >
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{st.label}:</span>
+                  {st.used ? (
+                    <span style={{ color: 'var(--accent-gold)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      ⭐ {st.match.home_team} x {st.match.away_team}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Disponível
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '50px 0', color: 'var(--text-secondary)' }}>
