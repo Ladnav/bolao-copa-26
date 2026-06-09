@@ -238,11 +238,14 @@ $$ language plpgsql immutable;
 -- Função auxiliar para determinar a fase do Super Palpite
 create or replace function public.get_match_super_guess_stage(p_match_id bigint, p_round text)
 returns text as $$
+declare
+  v_group_match_idx integer;
 begin
   if p_round = 'Fase de Grupos' then
-    if p_match_id between 1 and 24 then
+    v_group_match_idx := ((p_match_id - 1) % 6) + 1;
+    if v_group_match_idx in (1, 2) then
       return 'Grupo - Rodada 1';
-    elsif p_match_id between 25 and 48 then
+    elsif v_group_match_idx in (3, 4) then
       return 'Grupo - Rodada 2';
     else
       return 'Grupo - Rodada 3';

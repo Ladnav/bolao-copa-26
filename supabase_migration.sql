@@ -256,11 +256,14 @@ END $$;
 -- 9. Super Palpite: Criar helper get_match_super_guess_stage
 CREATE OR REPLACE FUNCTION public.get_match_super_guess_stage(p_match_id bigint, p_round text)
 RETURNS text AS $$
+DECLARE
+  v_group_match_idx integer;
 BEGIN
   IF p_round = 'Fase de Grupos' THEN
-    IF p_match_id BETWEEN 1 AND 24 THEN
+    v_group_match_idx := ((p_match_id - 1) % 6) + 1;
+    IF v_group_match_idx IN (1, 2) THEN
       RETURN 'Grupo - Rodada 1';
-    ELSIF p_match_id BETWEEN 25 AND 48 THEN
+    ELSIF v_group_match_idx IN (3, 4) THEN
       RETURN 'Grupo - Rodada 2';
     ELSE
       RETURN 'Grupo - Rodada 3';

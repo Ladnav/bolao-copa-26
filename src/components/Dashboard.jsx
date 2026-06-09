@@ -32,13 +32,13 @@ export default function Dashboard({ user, profile, showToast }) {
 
     const stages = [];
     if (roundFilter === 'Fase de Grupos') {
-      stages.push({ key: 'Grupo - Rodada 1', label: 'Rodada 1 (Grupos)', ids: [1, 24] });
-      stages.push({ key: 'Grupo - Rodada 2', label: 'Rodada 2 (Grupos)', ids: [25, 48] });
-      stages.push({ key: 'Grupo - Rodada 3', label: 'Rodada 3 (Grupos)', ids: [49, 72] });
+      stages.push({ key: 'Grupo - Rodada 1', label: 'Rodada 1 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 1 || idx === 2; } });
+      stages.push({ key: 'Grupo - Rodada 2', label: 'Rodada 2 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 3 || idx === 4; } });
+      stages.push({ key: 'Grupo - Rodada 3', label: 'Rodada 3 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 5 || idx === 6; } });
     } else if (roundFilter === 'Disputa de 3º lugar' || roundFilter === 'Final') {
-      stages.push({ key: 'Fase Final', label: 'Fase Final (3º Lugar ou Final)', ids: [103, 104] });
+      stages.push({ key: 'Fase Final', label: 'Fase Final (3º Lugar ou Final)', check: (m) => m.round === 'Final' || m.round === 'Disputa de 3º lugar' });
     } else {
-      stages.push({ key: roundFilter, label: roundFilter, ids: null });
+      stages.push({ key: roundFilter, label: roundFilter, check: (m) => m.round === roundFilter });
     }
 
     return stages.map(stage => {
@@ -52,14 +52,10 @@ export default function Dashboard({ user, profile, showToast }) {
           const m = matches.find(item => item.id === matchId);
           if (m) {
             let matchesStage = false;
-            if (stage.ids) {
-              if (stage.key === 'Fase Final') {
-                matchesStage = (m.round === 'Final' || m.round === 'Disputa de 3º lugar');
-              } else {
-                matchesStage = m.round === 'Fase de Grupos' && m.id >= stage.ids[0] && m.id <= stage.ids[1];
-              }
+            if (roundFilter === 'Fase de Grupos') {
+              matchesStage = m.round === 'Fase de Grupos' && stage.check(m);
             } else {
-              matchesStage = m.round === stage.key;
+              matchesStage = stage.check(m);
             }
 
             if (matchesStage) {
@@ -217,8 +213,9 @@ export default function Dashboard({ user, profile, showToast }) {
     const newSuperState = !guess.is_super;
     
     if (newSuperState) {
+      const groupMatchIdx = ((matchId - 1) % 6) + 1;
       const stageName = match.round === 'Fase de Grupos'
-        ? (matchId <= 24 ? 'Rodada 1 dos Grupos' : matchId <= 48 ? 'Rodada 2 dos Grupos' : 'Rodada 3 dos Grupos')
+        ? (groupMatchIdx <= 2 ? 'Rodada 1 dos Grupos' : groupMatchIdx <= 4 ? 'Rodada 2 dos Grupos' : 'Rodada 3 dos Grupos')
         : (match.round === 'Disputa de 3º lugar' || match.round === 'Final' ? 'Fase Final' : match.round);
       
       const confirmed = window.confirm(
