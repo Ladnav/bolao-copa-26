@@ -427,11 +427,21 @@ export default function Dashboard({ user, profile, showToast }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.2rem' }}>⭐</span>
-              <span style={{ fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.82rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                Status dos Seus Super Palpites (Dobro de Pontos!):
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.2rem' }}>⭐</span>
+                <span style={{ fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.82rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                  Status dos Seus Super Palpites (Dobro de Pontos!):
+                </span>
+              </div>
+              <a 
+                href="https://ge.globo.com/futebol/copa-do-mundo/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ fontSize: '0.78rem', color: 'var(--accent-blue)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: 'bold' }}
+              >
+                📊 Tabela e Classificação GE 🔗
+              </a>
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {getSuperGuessesStatus().map(st => (

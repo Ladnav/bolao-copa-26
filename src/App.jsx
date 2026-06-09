@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard';
 import Ranking from './components/Ranking';
 import Admin from './components/Admin';
 import Regras from './components/Regras';
-import { LogOut, LayoutDashboard, Trophy, ShieldAlert, Sparkles, BookOpen } from 'lucide-react';
+import { LogOut, LayoutDashboard, Trophy, ShieldAlert, Sparkles, BookOpen, ExternalLink } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
@@ -223,6 +223,16 @@ export default function App() {
           >
             <BookOpen size={16} /> Regras
           </button>
+
+          <a 
+            href="https://ge.globo.com/futebol/copa-do-mundo/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="nav-button"
+            style={{ textDecoration: 'none', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <ExternalLink size={16} /> Tabela GE
+          </a>
 
           {profile?.is_admin && (
             <button 
