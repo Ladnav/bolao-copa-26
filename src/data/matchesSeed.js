@@ -260,5 +260,16 @@ export const generateMatches = () => {
     openingMatch.match_date = new Date('2026-06-11T13:00:00-06:00').toISOString();
   }
 
+  // Ajuste especial para o Canadá x Bósnia e Catar x Suíça (Dia 12/06)
+  const canadaMatch1 = matches.find(m => m.home_team === 'Canadá' && m.away_team === 'Bósnia e Herzegovina');
+  if (canadaMatch1) {
+    canadaMatch1.match_date = new Date('2026-06-12T16:00:00-03:00').toISOString();
+  }
+
+  const qatarMatch1 = matches.find(m => m.home_team === 'Catar' && m.away_team === 'Suíça');
+  if (qatarMatch1) {
+    qatarMatch1.match_date = new Date('2026-06-12T21:00:00-03:00').toISOString();
+  }
+
   return matches;
 };
