@@ -137,6 +137,38 @@ const groupsData = {
 
 // Gerador sistemático de partidas
 export const generateMatches = () => {
+  const makeBrtDate = (day, hour, minute = 0) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    return new Date(`2026-06-${pad(day)}T${pad(hour)}:${pad(minute)}:00-03:00`).toISOString();
+  };
+
+  const groupSchedule = [
+    // Grupo A (0)
+    { r1Day1: 11, r1Hour1: 16, r1Day2: 11, r1Hour2: 19, r2Day1: 18, r2Hour1: 16, r2Day2: 18, r2Hour2: 19, r3Day1: 24, r3Hour1: 16, r3Day2: 24, r3Hour2: 16 },
+    // Grupo B (1)
+    { r1Day1: 12, r1Hour1: 16, r1Day2: 12, r1Hour2: 21, r2Day1: 18, r2Hour1: 16, r2Day2: 18, r2Hour2: 21, r3Day1: 24, r3Hour1: 20, r3Day2: 24, r3Hour2: 20 },
+    // Grupo C (2)
+    { r1Day1: 14, r1Hour1: 19, r1Day2: 13, r1Hour2: 19, r2Day1: 19, r2Hour1: 21, r2Hour2: 30, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 19, r3Day2: 24, r3Hour2: 16, hasMinutes: true },
+    // Grupo D (3)
+    { r1Day1: 12, r1Hour1: 22, r1Day2: 14, r1Hour2: 1, r2Day1: 19, r2Hour1: 16, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 20, r3Day2: 25, r3Hour2: 20 },
+    // Grupo E (4)
+    { r1Day1: 14, r1Hour1: 13, r1Day2: 14, r1Hour2: 19, r2Day1: 20, r2Hour1: 13, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 16, r3Day2: 25, r3Hour2: 16 },
+    // Grupo F (5)
+    { r1Day1: 14, r1Hour1: 16, r1Day2: 14, r1Hour2: 21, r2Day1: 20, r2Hour1: 16, r2Day2: 20, r2Hour2: 21, r3Day1: 25, r3Hour1: 20, r3Day2: 25, r3Hour2: 20 },
+    // Grupo G (6)
+    { r1Day1: 15, r1Hour1: 13, r1Day2: 15, r1Hour2: 19, r2Day1: 21, r2Hour1: 13, r2Day2: 21, r2Hour2: 19, r3Day1: 26, r3Hour1: 16, r3Day2: 26, r3Hour2: 16 },
+    // Grupo H (7)
+    { r1Day1: 15, r1Hour1: 16, r1Day2: 15, r1Hour2: 21, r2Day1: 21, r2Hour1: 16, r2Day2: 21, r2Hour2: 21, r3Day1: 26, r3Hour1: 20, r3Day2: 26, r3Hour2: 20 },
+    // Grupo I (8)
+    { r1Day1: 16, r1Hour1: 13, r1Day2: 16, r1Hour2: 19, r2Day1: 22, r2Hour1: 13, r2Day2: 22, r2Hour2: 19, r3Day1: 26, r3Hour1: 16, r3Day2: 26, r3Hour2: 16 },
+    // Grupo J (9)
+    { r1Day1: 16, r1Hour1: 16, r1Day2: 16, r1Hour2: 21, r2Day1: 22, r2Hour1: 16, r2Day2: 22, r2Hour2: 21, r3Day1: 27, r3Hour1: 20, r3Day2: 27, r3Hour2: 20 },
+    // Grupo K (10)
+    { r1Day1: 17, r1Hour1: 13, r1Day2: 17, r1Hour2: 19, r2Day1: 23, r2Hour1: 13, r2Day2: 23, r2Hour2: 19, r3Day1: 27, r3Hour1: 16, r3Day2: 27, r3Hour2: 16 },
+    // Grupo L (11)
+    { r1Day1: 17, r1Hour1: 16, r1Day2: 17, r1Hour2: 21, r2Day1: 23, r2Hour1: 16, r2Day2: 23, r2Hour2: 21, r3Day1: 27, r3Hour1: 20, r3Day2: 27, r3Hour2: 20 }
+  ];
+
   const matches = [];
   let matchId = 1;
 
@@ -144,13 +176,9 @@ export const generateMatches = () => {
 
   groupKeys.forEach((groupName, gIdx) => {
     const teams = groupsData[groupName];
+    const sched = groupSchedule[gIdx];
 
     // Rodada 1 de Grupos
-    // Jogo 1: Team 0 vs Team 1
-    // Jogo 2: Team 2 vs Team 3
-    const r1Date = new Date(`2026-06-11T00:00:00-03:00`);
-    r1Date.setDate(r1Date.getDate() + Math.floor(gIdx / 2)); // 2 grupos por dia
-    
     matches.push({
       id: matchId++,
       round: 'Fase de Grupos',
@@ -160,7 +188,7 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[0].name),
       away_team_flag: getFlagUrl(teams[1].name),
       status: 'scheduled',
-      match_date: new Date(r1Date.setHours(gIdx % 2 === 0 ? 13 : 16, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r1Day1, sched.r1Hour1)
     });
 
     matches.push({
@@ -172,15 +200,10 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[2].name),
       away_team_flag: getFlagUrl(teams[3].name),
       status: 'scheduled',
-      match_date: new Date(r1Date.setHours(gIdx % 2 === 0 ? 19 : 21, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r1Day2, sched.r1Hour2)
     });
 
     // Rodada 2 de Grupos
-    // Jogo 3: Team 0 vs Team 2
-    // Jogo 4: Team 1 vs Team 3
-    const r2Date = new Date(`2026-06-17T00:00:00-03:00`);
-    r2Date.setDate(r2Date.getDate() + Math.floor(gIdx / 2));
-
     matches.push({
       id: matchId++,
       round: 'Fase de Grupos',
@@ -190,7 +213,7 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[0].name),
       away_team_flag: getFlagUrl(teams[2].name),
       status: 'scheduled',
-      match_date: new Date(r2Date.setHours(gIdx % 2 === 0 ? 13 : 16, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r2Day1, sched.r2Hour1, sched.hasMinutes ? 30 : 0)
     });
 
     matches.push({
@@ -202,17 +225,10 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[1].name),
       away_team_flag: getFlagUrl(teams[3].name),
       status: 'scheduled',
-      match_date: new Date(r2Date.setHours(gIdx % 2 === 0 ? 19 : 21, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r2Day2, sched.r2Hour2)
     });
 
     // Rodada 3 de Grupos
-    // Jogo 5: Team 3 vs Team 0
-    // Jogo 6: Team 1 vs Team 2
-    const r3Date = new Date(`2026-06-23T00:00:00-03:00`);
-    r3Date.setDate(r3Date.getDate() + Math.floor(gIdx / 2));
-
-    const simHour = gIdx % 2 === 0 ? 16 : 20;
-
     matches.push({
       id: matchId++,
       round: 'Fase de Grupos',
@@ -222,7 +238,7 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[3].name),
       away_team_flag: getFlagUrl(teams[0].name),
       status: 'scheduled',
-      match_date: new Date(r3Date.setHours(simHour, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r3Day1, sched.r3Hour1)
     });
 
     matches.push({
@@ -234,42 +250,9 @@ export const generateMatches = () => {
       home_team_flag: getFlagUrl(teams[1].name),
       away_team_flag: getFlagUrl(teams[2].name),
       status: 'scheduled',
-      match_date: new Date(r3Date.setHours(simHour, 0, 0)).toISOString()
+      match_date: makeBrtDate(sched.r3Day2, sched.r3Hour2)
     });
   });
-
-  // Ajuste especial para o jogo do Brasil na Rodada 1
-  const brasilMatch1 = matches.find(m => m.home_team === 'Brasil' && m.away_team === 'Marrocos');
-  if (brasilMatch1) {
-    brasilMatch1.match_date = new Date('2026-06-13T19:00:00-03:00').toISOString();
-  }
-
-  const brasilMatch2 = matches.find(m => m.home_team === 'Brasil' && m.away_team === 'Haiti');
-  if (brasilMatch2) {
-    brasilMatch2.match_date = new Date('2026-06-19T21:30:00-03:00').toISOString();
-  }
-
-  const brasilMatch3 = matches.find(m => m.home_team === 'Escócia' && m.away_team === 'Brasil');
-  if (brasilMatch3) {
-    brasilMatch3.match_date = new Date('2026-06-24T19:00:00-03:00').toISOString();
-  }
-
-  // Ajuste do jogo de abertura
-  const openingMatch = matches.find(m => m.home_team === 'México' && m.away_team === 'África do Sul');
-  if (openingMatch) {
-    openingMatch.match_date = new Date('2026-06-11T13:00:00-06:00').toISOString();
-  }
-
-  // Ajuste especial para o Canadá x Bósnia e Catar x Suíça (Dia 12/06)
-  const canadaMatch1 = matches.find(m => m.home_team === 'Canadá' && m.away_team === 'Bósnia e Herzegovina');
-  if (canadaMatch1) {
-    canadaMatch1.match_date = new Date('2026-06-12T16:00:00-03:00').toISOString();
-  }
-
-  const qatarMatch1 = matches.find(m => m.home_team === 'Catar' && m.away_team === 'Suíça');
-  if (qatarMatch1) {
-    qatarMatch1.match_date = new Date('2026-06-12T21:00:00-03:00').toISOString();
-  }
 
   return matches;
 };
