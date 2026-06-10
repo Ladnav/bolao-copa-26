@@ -148,7 +148,7 @@ export const generateMatches = () => {
     // Grupo B (1)
     { r1Day1: 12, r1Hour1: 16, r1Day2: 12, r1Hour2: 21, r2Day1: 18, r2Hour1: 16, r2Day2: 18, r2Hour2: 21, r3Day1: 24, r3Hour1: 20, r3Day2: 24, r3Hour2: 20 },
     // Grupo C (2)
-    { r1Day1: 14, r1Hour1: 19, r1Day2: 13, r1Hour2: 19, r2Day1: 19, r2Hour1: 21, r2Hour2: 30, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 19, r3Day2: 24, r3Hour2: 16, hasMinutes: true },
+    { r1Day1: 13, r1Hour1: 19, r1Day2: 13, r1Hour2: 22, r2Day1: 19, r2Hour1: 21, r2Day2: 19, r2Hour2: 19, r3Day1: 24, r3Hour1: 19, r3Day2: 24, r3Hour2: 19, hasMinutes: true },
     // Grupo D (3)
     { r1Day1: 12, r1Hour1: 22, r1Day2: 14, r1Hour2: 1, r2Day1: 19, r2Hour1: 16, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 20, r3Day2: 25, r3Hour2: 20 },
     // Grupo E (4)
