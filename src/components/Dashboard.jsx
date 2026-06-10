@@ -361,6 +361,205 @@ export default function Dashboard({ user, profile, showToast }) {
     return matchRound && matchGroup && searchMatch;
   });
 
+  const renderMatchCard = (match) => {
+    const guessClosed = isGuessClosed(match);
+    const guess = userGuesses[match.id] || { home_guess: '', away_guess: '', points_awarded: null };
+
+    return (
+      <div
+        key={match.id}
+        className={`match-card glass-panel ${match.status === 'finished' ? 'finished' : ''} ${guess.is_super ? 'super-guess-card' : ''}`}
+      >
+        {/* Header do Jogo */}
+        <div className="match-header">
+          <span className="match-badge">
+            {match.round} {match.group_name ? `• Grupo ${match.group_name}` : ''}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {guess.is_super && guessClosed && (
+              <span className="super-badge">⭐ Super</span>
+            )}
+            {user && !guessClosed && (
+              <button
+                className={`btn-star ${guess.is_super ? 'active' : ''}`}
+                onClick={() => toggleSuperGuess(match.id)}
+                disabled={savingId === match.id}
+                title={guess.is_super ? "Remover Super Palpite" : "Marcar como Super Palpite (Dobro de Pontos!)"}
+              >
+                ⭐
+              </button>
+            )}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
+              <Calendar size={13} />
+              {formatDate(match.match_date)}
+            </span>
+          </div>
+        </div>
+
+        {/* Times e Placar Oficial */}
+        <div className="match-teams-container">
+          <div className="team-box">
+            {renderFlag(match.home_team_flag)}
+            <span className="team-name" title={match.home_team}>{match.home_team}</span>
+          </div>
+
+          <div className="score-vs-container">
+            {match.status === 'finished' ? (
+              <div className="actual-scores">
+                <span>{match.home_score}</span>
+                <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>x</span>
+                <span>{match.away_score}</span>
+              </div>
+            ) : match.status === 'live' ? (
+              <div className="actual-scores" style={{ color: 'var(--error)' }}>
+                <span>{match.home_score ?? 0}</span>
+                <span className="status-live" style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '3px' }}>AO VIVO</span>
+                <span>{match.away_score ?? 0}</span>
+              </div>
+            ) : (
+              <span className="match-vs">VS</span>
+            )}
+          </div>
+
+          <div className="team-box">
+            {renderFlag(match.away_team_flag)}
+            <span className="team-name" title={match.away_team}>{match.away_team}</span>
+          </div>
+        </div>
+
+        {/* Seção de Palpite */}
+        <div style={{ marginTop: '15px' }}>
+          {!guessClosed ? (
+            // Palpites abertos
+            <div>
+              {/* Se tem palpite salvo e não está editando: mostra card salvo */}
+              {guess.isSaved && !editingMatches.has(match.id) ? (
+                <div className="saved-guess-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--accent-green)" />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Seu palpite:</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="saved-guess-score">
+                      {guess.home_guess} <span style={{ color: 'var(--text-muted)' }}>x</span> {guess.away_guess}
+                    </span>
+                    <button
+                      className="edit-guess-btn"
+                      onClick={() => startEditing(match.id)}
+                      title="Editar palpite"
+                    >
+                      <Pencil size={13} />
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Inputs de palpite (novo ou editando)
+                <div>
+                  <div className="guess-inputs-container">
+                    <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
+                      {editingMatches.has(match.id) ? 'Alterar palpite:' : 'Seu Palpite:'}
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      className="guess-input"
+                      placeholder="-"
+                      value={guess.home_guess}
+                      onChange={(e) => handleGuessChange(match.id, 'home', e.target.value)}
+                      autoFocus={editingMatches.has(match.id)}
+                    />
+                    <span style={{ color: 'var(--text-secondary)' }}>x</span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="guess-input"
+                      placeholder="-"
+                      value={guess.away_guess}
+                      onChange={(e) => handleGuessChange(match.id, 'away', e.target.value)}
+                    />
+                    <button
+                      onClick={() => saveGuess(match.id)}
+                      className="guess-btn-save"
+                      disabled={savingId === match.id}
+                      title="Salvar Palpite"
+                    >
+                      {savingId === match.id ? '...' : <Save size={16} color="#fff" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* Prazo de palpite */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                <Clock size={11} />
+                {formatDeadline(match)}
+              </div>
+            </div>
+          ) : (
+            // Palpites fechados (jogo começou ou prazo passou)
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="guess-inputs-container" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'transparent' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <Lock size={12} />
+                  Palpite fechado:
+                </div>
+                <input
+                  type="text"
+                  className="guess-input"
+                  value={guess.home_guess !== '' ? guess.home_guess : '-'}
+                  readOnly
+                  style={{ cursor: 'default', opacity: 0.7 }}
+                />
+                <span style={{ color: 'var(--text-muted)' }}>x</span>
+                <input
+                  type="text"
+                  className="guess-input"
+                  value={guess.away_guess !== '' ? guess.away_guess : '-'}
+                  readOnly
+                  style={{ cursor: 'default', opacity: 0.7 }}
+                />
+
+                {match.status === 'finished' && guess.points_awarded !== null && (
+                  <div 
+                    className="guess-result-badge" 
+                    style={{ 
+                      marginLeft: '10px',
+                      background: guess.is_super ? 'linear-gradient(135deg, var(--accent-gold) 0%, #d97706 100%)' : 'rgba(16, 185, 129, 0.15)',
+                      borderColor: guess.is_super ? 'var(--accent-gold)' : 'rgba(16, 185, 129, 0.3)',
+                      color: guess.is_super ? '#000' : 'inherit'
+                    }}
+                  >
+                    <span className="points-text" style={{ color: guess.is_super ? '#000' : 'var(--accent-green)', fontWeight: '800' }}>
+                      +{guess.points_awarded} pts {guess.is_super ? '⭐' : ''}
+                    </span>
+                    <span style={{ fontSize: '0.65rem', color: guess.is_super ? 'rgba(0,0,0,0.8)' : 'var(--text-muted)', fontWeight: guess.is_super ? '700' : 'normal' }}>
+                      {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
+                       guess.points_awarded === 14 || guess.points_awarded === 7 ? '🎯 Saldo' :
+                       guess.points_awarded === 10 || guess.points_awarded === 5 ? '✅ Venc+Gols' :
+                       guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : 
+                       guess.points_awarded === 2 || guess.points_awarded === 1 ? '🤝 Empate' : '❌ Zerou'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Botão para ver palpites da galera - apenas após o jogo começar */}
+              {new Date(match.match_date) <= new Date() && (
+                <button
+                  className="nav-button"
+                  onClick={() => openGuessesModal(match)}
+                  style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--card-border)', fontSize: '0.85rem', padding: '6px' }}
+                >
+                  <Eye size={14} /> Ver Palpites da Galera
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Barra de Filtros */}
@@ -492,206 +691,53 @@ export default function Dashboard({ user, profile, showToast }) {
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
           Nenhum jogo encontrado para os filtros selecionados.
         </div>
+      ) : roundFilter === 'Fase de Grupos' ? (
+        // Renderiza jogos agrupados por rodadas para Fase de Grupos
+        (() => {
+          const groupedMatches = {
+            '1ª Rodada': [],
+            '2ª Rodada': [],
+            '3ª Rodada': []
+          };
+
+          filteredMatches.forEach(match => {
+            const idx = ((match.id - 1) % 6) + 1;
+            if (idx === 1 || idx === 2) {
+              groupedMatches['1ª Rodada'].push(match);
+            } else if (idx === 3 || idx === 4) {
+              groupedMatches['2ª Rodada'].push(match);
+            } else {
+              groupedMatches['3ª Rodada'].push(match);
+            }
+          });
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {['1ª Rodada', '2ª Rodada', '3ª Rodada'].map(rodadaName => {
+                const matchesInRodada = groupedMatches[rodadaName];
+                if (matchesInRodada.length === 0) return null;
+
+                return (
+                  <div key={rodadaName} className="rodada-section">
+                    <h3 className="rodada-title">
+                      <span>📅</span> {rodadaName}
+                      <span className="rodada-badge">
+                        {matchesInRodada.length} {matchesInRodada.length === 1 ? 'jogo' : 'jogos'}
+                      </span>
+                    </h3>
+                    <div className="cards-grid">
+                      {matchesInRodada.map(renderMatchCard)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()
       ) : (
+        // Comportamento padrão para as demais fases (mata-mata)
         <div className="cards-grid">
-          {filteredMatches.map(match => {
-            const guessClosed = isGuessClosed(match);
-            const guess = userGuesses[match.id] || { home_guess: '', away_guess: '', points_awarded: null };
-
-            return (
-              <div
-                key={match.id}
-                className={`match-card glass-panel ${match.status === 'finished' ? 'finished' : ''} ${guess.is_super ? 'super-guess-card' : ''}`}
-              >
-                {/* Header do Jogo */}
-                <div className="match-header">
-                  <span className="match-badge">
-                    {match.round} {match.group_name ? `• Grupo ${match.group_name}` : ''}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {guess.is_super && guessClosed && (
-                      <span className="super-badge">⭐ Super</span>
-                    )}
-                    {user && !guessClosed && (
-                      <button
-                        className={`btn-star ${guess.is_super ? 'active' : ''}`}
-                        onClick={() => toggleSuperGuess(match.id)}
-                        disabled={savingId === match.id}
-                        title={guess.is_super ? "Remover Super Palpite" : "Marcar como Super Palpite (Dobro de Pontos!)"}
-                      >
-                        ⭐
-                      </button>
-                    )}
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
-                      <Calendar size={13} />
-                      {formatDate(match.match_date)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Times e Placar Oficial */}
-                <div className="match-teams-container">
-                  <div className="team-box">
-                    {renderFlag(match.home_team_flag)}
-                    <span className="team-name" title={match.home_team}>{match.home_team}</span>
-                  </div>
-
-                  <div className="score-vs-container">
-                    {match.status === 'finished' ? (
-                      <div className="actual-scores">
-                        <span>{match.home_score}</span>
-                        <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>x</span>
-                        <span>{match.away_score}</span>
-                      </div>
-                    ) : match.status === 'live' ? (
-                      <div className="actual-scores" style={{ color: 'var(--error)' }}>
-                        <span>{match.home_score ?? 0}</span>
-                        <span className="status-live" style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '3px' }}>AO VIVO</span>
-                        <span>{match.away_score ?? 0}</span>
-                      </div>
-                    ) : (
-                      <span className="match-vs">VS</span>
-                    )}
-                  </div>
-
-                  <div className="team-box">
-                    {renderFlag(match.away_team_flag)}
-                    <span className="team-name" title={match.away_team}>{match.away_team}</span>
-                  </div>
-                </div>
-
-                {/* Seção de Palpite */}
-                <div style={{ marginTop: '15px' }}>
-                  {!guessClosed ? (
-                    // Palpites abertos
-                    <div>
-                      {/* Se tem palpite salvo e não está editando: mostra card salvo */}
-                      {guess.isSaved && !editingMatches.has(match.id) ? (
-                        <div className="saved-guess-card">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <CheckCircle2 size={16} color="var(--accent-green)" />
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Seu palpite:</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span className="saved-guess-score">
-                              {guess.home_guess} <span style={{ color: 'var(--text-muted)' }}>x</span> {guess.away_guess}
-                            </span>
-                            <button
-                              className="edit-guess-btn"
-                              onClick={() => startEditing(match.id)}
-                              title="Editar palpite"
-                            >
-                              <Pencil size={13} />
-                              Editar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        // Inputs de palpite (novo ou editando)
-                        <div>
-                          <div className="guess-inputs-container">
-                            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
-                              {editingMatches.has(match.id) ? 'Alterar palpite:' : 'Seu Palpite:'}
-                            </div>
-                            <input
-                              type="number"
-                              min="0"
-                              className="guess-input"
-                              placeholder="-"
-                              value={guess.home_guess}
-                              onChange={(e) => handleGuessChange(match.id, 'home', e.target.value)}
-                              autoFocus={editingMatches.has(match.id)}
-                            />
-                            <span style={{ color: 'var(--text-secondary)' }}>x</span>
-                            <input
-                              type="number"
-                              min="0"
-                              className="guess-input"
-                              placeholder="-"
-                              value={guess.away_guess}
-                              onChange={(e) => handleGuessChange(match.id, 'away', e.target.value)}
-                            />
-                            <button
-                              onClick={() => saveGuess(match.id)}
-                              className="guess-btn-save"
-                              disabled={savingId === match.id}
-                              title="Salvar Palpite"
-                            >
-                              {savingId === match.id ? '...' : <Save size={16} color="#fff" />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {/* Prazo de palpite */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        <Clock size={11} />
-                        {formatDeadline(match)}
-                      </div>
-                    </div>
-                  ) : (
-                    // Palpites fechados (jogo começou ou prazo passou)
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      <div className="guess-inputs-container" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'transparent' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          <Lock size={12} />
-                          Palpite fechado:
-                        </div>
-                        <input
-                          type="text"
-                          className="guess-input"
-                          value={guess.home_guess !== '' ? guess.home_guess : '-'}
-                          readOnly
-                          style={{ cursor: 'default', opacity: 0.7 }}
-                        />
-                        <span style={{ color: 'var(--text-muted)' }}>x</span>
-                        <input
-                          type="text"
-                          className="guess-input"
-                          value={guess.away_guess !== '' ? guess.away_guess : '-'}
-                          readOnly
-                          style={{ cursor: 'default', opacity: 0.7 }}
-                        />
-
-                        {match.status === 'finished' && guess.points_awarded !== null && (
-                          <div 
-                            className="guess-result-badge" 
-                            style={{ 
-                              marginLeft: '10px',
-                              background: guess.is_super ? 'linear-gradient(135deg, var(--accent-gold) 0%, #d97706 100%)' : 'rgba(16, 185, 129, 0.15)',
-                              borderColor: guess.is_super ? 'var(--accent-gold)' : 'rgba(16, 185, 129, 0.3)',
-                              color: guess.is_super ? '#000' : 'inherit'
-                            }}
-                          >
-                            <span className="points-text" style={{ color: guess.is_super ? '#000' : 'var(--accent-green)', fontWeight: '800' }}>
-                              +{guess.points_awarded} pts {guess.is_super ? '⭐' : ''}
-                            </span>
-                            <span style={{ fontSize: '0.65rem', color: guess.is_super ? 'rgba(0,0,0,0.8)' : 'var(--text-muted)', fontWeight: guess.is_super ? '700' : 'normal' }}>
-                              {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
-                               guess.points_awarded === 14 || guess.points_awarded === 7 ? '🎯 Saldo' :
-                               guess.points_awarded === 10 || guess.points_awarded === 5 ? '✅ Venc+Gols' :
-                               guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : 
-                               guess.points_awarded === 2 || guess.points_awarded === 1 ? '🤝 Empate' : '❌ Zerou'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Botão para ver palpites da galera - apenas após o jogo começar */}
-                      {new Date(match.match_date) <= new Date() && (
-                        <button
-                          className="nav-button"
-                          onClick={() => openGuessesModal(match)}
-                          style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--card-border)', fontSize: '0.85rem', padding: '6px' }}
-                        >
-                          <Eye size={14} /> Ver Palpites da Galera
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {filteredMatches.map(renderMatchCard)}
         </div>
       )}
 
