@@ -103,7 +103,7 @@ create policy "Ver palpites próprios ou de outros pós-início"
   );
 
 -- Política de Inserção: Apenas o próprio usuário, e antes do prazo de palpite
--- O prazo é guess_deadline se definido, senão 24h antes da match_date
+-- O prazo é guess_deadline se definido, senão 2h antes da match_date
 create policy "Inserir próprios palpites antes do prazo"
   on public.guesses for insert
   with check (
@@ -111,7 +111,7 @@ create policy "Inserir próprios palpites antes do prazo"
     and exists (
       select 1 from public.matches
       where matches.id = guesses.match_id
-      and coalesce(matches.guess_deadline, matches.match_date - interval '24 hours') > now()
+      and coalesce(matches.guess_deadline, matches.match_date - interval '2 hours') > now()
     )
   );
 
@@ -123,7 +123,7 @@ create policy "Atualizar próprios palpites antes do prazo"
     and exists (
       select 1 from public.matches
       where matches.id = guesses.match_id
-      and coalesce(matches.guess_deadline, matches.match_date - interval '24 hours') > now()
+      and coalesce(matches.guess_deadline, matches.match_date - interval '2 hours') > now()
     )
   )
   with check (
@@ -131,7 +131,7 @@ create policy "Atualizar próprios palpites antes do prazo"
     and exists (
       select 1 from public.matches
       where matches.id = guesses.match_id
-      and coalesce(matches.guess_deadline, matches.match_date - interval '24 hours') > now()
+      and coalesce(matches.guess_deadline, matches.match_date - interval '2 hours') > now()
     )
   );
 
@@ -143,7 +143,7 @@ create policy "Deletar próprios palpites antes do prazo"
     and exists (
       select 1 from public.matches
       where matches.id = guesses.match_id
-      and coalesce(matches.guess_deadline, matches.match_date - interval '24 hours') > now()
+      and coalesce(matches.guess_deadline, matches.match_date - interval '2 hours') > now()
     )
   );
 
