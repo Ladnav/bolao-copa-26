@@ -979,8 +979,6 @@ export default function Dashboard({ user, profile, showToast }) {
             <div className="thp-spinner" />
             <span>Buscando histórico...</span>
           </div>
-        ) : !teamPopover.data || teamPopover.data.length === 0 ? (
-          <div className="thp-empty">Nenhum jogo encontrado para esta seleção.</div>
         ) : (() => {
           // Calcula estatísticas em tempo real do torneio atual
           let tMatches = 0, tWins = 0, tDraws = 0, tLosses = 0, tGoalsFor = 0, tGoalsAgainst = 0;
@@ -1044,7 +1042,10 @@ export default function Dashboard({ user, profile, showToast }) {
               {/* Último jogo (API) */}
               <div className="thp-list">
                 <div className="thp-subtitle">Último jogo (Geral)</div>
-                {teamPopover.data.map((ev, i) => {
+                {!teamPopover.data || teamPopover.data.length === 0 ? (
+                  <div className="thp-empty" style={{ padding: '10px 0', fontSize: '0.8rem' }}>Nenhum jogo recente encontrado.</div>
+                ) : (
+                  teamPopover.data.map((ev, i) => {
               const isHome = ev.strHomeTeam?.toLowerCase() === translateTeamName(teamPopover.teamName).toLowerCase()
                 || ev.strHomeTeam?.toLowerCase() === teamPopover.teamName.toLowerCase();
               const myScore  = isHome ? parseInt(ev.intHomeScore) : parseInt(ev.intAwayScore);
@@ -1076,7 +1077,8 @@ export default function Dashboard({ user, profile, showToast }) {
                   <span className="thp-date">{dateStr}</span>
                 </div>
               );
-            })}
+            })
+            )}
                 <div className="thp-footer">Fonte: TheSportsDB • Clique fora para fechar</div>
               </div>
             </div>

@@ -15,8 +15,8 @@ const TEAM_NAME_MAP = {
   'peru': 'peru',
 
   // América do Norte / Central / Caribe
-  'eua': 'united states',
-  'estados unidos': 'united states',
+  'eua': 'usa',
+  'estados unidos': 'usa',
   'méxico': 'mexico',
   'mexico': 'mexico',
   'canadá': 'canada',
