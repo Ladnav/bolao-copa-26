@@ -820,9 +820,7 @@ select.select-filter option,
   }
   
   .ranking-table th:nth-child(3),
-  .ranking-table td:nth-child(3),
-  .ranking-table th:nth-child(4),
-  .ranking-table td:nth-child(4) {
+  .ranking-table td:nth-child(3) {
     display: none; /* Hide detailed stats on mobile */
   }
   
