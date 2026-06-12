@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Search, Save, Eye, Calendar, Clock, Lock, Pencil, CheckCircle2, BellOff } from 'lucide-react';
+import { Search, Save, Eye, Calendar, Clock, Lock, Pencil, CheckCircle2, BellOff, ChevronRight } from 'lucide-react';
+import { translateTeamName } from '../data/teamNameMap';
 
 const renderFlag = (flag) => {
   if (!flag) return <span className="team-flag">🏳️</span>;
@@ -27,6 +28,101 @@ export default function Dashboard({ user, profile, showToast }) {
   const [modalMatch, setModalMatch] = useState(null);
   const [modalGuesses, setModalGuesses] = useState([]);
   const [loadingModal, setLoadingModal] = useState(false);
+
+  // Popover de histórico da seleção
+  const [teamPopover, setTeamPopover] = useState(null); // { teamName, x, y, data, loading }
+  const teamHistoryCache = useRef(new Map()); // cache por nome de seleção
+  const popoverRef = useRef(null);
+
+  // Categoriza a competição pelo nome retornado pela API
+  const getCompetitionInfo = (leagueName) => {
+    const l = (leagueName || '').toLowerCase();
+    if (l.includes('world cup qualifying')) return { label: 'Eliminatórias', emoji: '🎯', color: '#8b5cf6' };
+    if (l.includes('world cup'))           return { label: 'Copa do Mundo', emoji: '🌍', color: '#f59e0b' };
+    if (l.includes('copa america'))        return { label: 'Copa América',   emoji: '🏆', color: '#10b981' };
+    if (l.includes('euro'))                return { label: 'Eurocopa',       emoji: '🇪🇺', color: '#3b82f6' };
+    if (l.includes('nations league'))      return { label: 'Liga das Nações',emoji: '⚔️',  color: '#a855f7' };
+    if (l.includes('africa') || l.includes('afcon')) return { label: 'Copa Africana', emoji: '🌍', color: '#f97316' };
+    if (l.includes('asia'))                return { label: 'Copa Asiática',  emoji: '🌏', color: '#ec4899' };
+    if (l.includes('concacaf') || l.includes('gold cup')) return { label: 'Copa Ouro',  emoji: '🌎', color: '#14b8a6' };
+    if (l.includes('friendly'))            return { label: 'Amistoso',       emoji: '🤝', color: '#6b7280' };
+    if (l.includes('olympic'))             return { label: 'Olimpíadas',     emoji: '🏅', color: '#f59e0b' };
+    return { label: leagueName || 'Jogo Int.', emoji: '⚽', color: '#6b7280' };
+  };
+
+  // Fecha popover ao clicar fora ou pressionar Escape
+  useEffect(() => {
+    if (!teamPopover) return;
+    const handleClick = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        setTeamPopover(null);
+      }
+    };
+    const handleKey = (e) => { if (e.key === 'Escape') setTeamPopover(null); };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [teamPopover]);
+
+  const fetchTeamHistory = useCallback(async (teamName, anchorRect) => {
+    // Fecha se clicar na mesma seleção de novo
+    if (teamPopover?.teamName === teamName) {
+      setTeamPopover(null);
+      return;
+    }
+
+    // Posição do popover baseada no elemento clicado
+    const x = Math.min(anchorRect.left, window.innerWidth - 320);
+    const y = anchorRect.bottom + window.scrollY + 8;
+
+    // Cache hit
+    if (teamHistoryCache.current.has(teamName)) {
+      setTeamPopover({ teamName, x, y, data: teamHistoryCache.current.get(teamName), loading: false });
+      return;
+    }
+
+    setTeamPopover({ teamName, x, y, data: null, loading: true });
+
+    try {
+      const enName = translateTeamName(teamName);
+      const PROXY = 'https://corsproxy.io/?';
+      const BASE  = 'https://www.thesportsdb.com/api/v1/json/3';
+
+      // 1. Busca ID da seleção
+      const searchRes = await fetch(`${PROXY}${encodeURIComponent(`${BASE}/searchteams.php?t=${enName}`)}`);
+      const searchJson = await searchRes.json();
+      // Filtra apenas times de futebol masculino sênior (sem U17, U20, Feminino)
+      const team = (searchJson.teams || []).find(t =>
+        t.strSport === 'Soccer' &&
+        !t.strTeam.toLowerCase().includes('u17') &&
+        !t.strTeam.toLowerCase().includes('u20') &&
+        !t.strTeam.toLowerCase().includes('u23') &&
+        !t.strTeam.toLowerCase().includes('women') &&
+        !t.strTeam.toLowerCase().includes('female')
+      );
+
+      if (!team) {
+        teamHistoryCache.current.set(teamName, []);
+        setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: [], loading: false } : prev);
+        return;
+      }
+
+      // 2. Busca últimos jogos
+      const eventsRes = await fetch(`${PROXY}${encodeURIComponent(`${BASE}/eventslast.php?id=${team.idTeam}`)}`);
+      const eventsJson = await eventsRes.json();
+      const results = (eventsJson.results || []).slice(0, 5).reverse(); // mais antigo → mais recente
+
+      teamHistoryCache.current.set(teamName, results);
+      setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: results, loading: false } : prev);
+    } catch (err) {
+      console.error('Erro ao buscar histórico:', err);
+      teamHistoryCache.current.set(teamName, []);
+      setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: [], loading: false } : prev);
+    }
+  }, [teamPopover]);
 
   // Função para retornar quais super palpites estão ativos e em qual jogo para a fase selecionada
   const getSuperGuessesStatus = () => {
@@ -409,9 +505,14 @@ export default function Dashboard({ user, profile, showToast }) {
 
         {/* Times e Placar Oficial */}
         <div className="match-teams-container">
-          <div className="team-box">
+          <div
+            className={`team-box team-box-clickable${teamPopover?.teamName === match.home_team ? ' team-box-active' : ''}`}
+            onClick={(e) => fetchTeamHistory(match.home_team, e.currentTarget.getBoundingClientRect())}
+            title={`Ver histórico de ${match.home_team}`}
+          >
             {renderFlag(match.home_team_flag)}
-            <span className="team-name" title={match.home_team}>{match.home_team}</span>
+            <span className="team-name">{match.home_team}</span>
+            <ChevronRight size={11} className="team-history-icon" />
           </div>
 
           <div className="score-vs-container">
@@ -432,9 +533,14 @@ export default function Dashboard({ user, profile, showToast }) {
             )}
           </div>
 
-          <div className="team-box">
+          <div
+            className={`team-box team-box-clickable${teamPopover?.teamName === match.away_team ? ' team-box-active' : ''}`}
+            onClick={(e) => fetchTeamHistory(match.away_team, e.currentTarget.getBoundingClientRect())}
+            title={`Ver histórico de ${match.away_team}`}
+          >
+            <ChevronRight size={11} className="team-history-icon" />
+            <span className="team-name">{match.away_team}</span>
             {renderFlag(match.away_team_flag)}
-            <span className="team-name" title={match.away_team}>{match.away_team}</span>
           </div>
         </div>
 
@@ -572,7 +678,8 @@ export default function Dashboard({ user, profile, showToast }) {
   };
 
   return (
-    <div>
+    <>
+      <div>
       {/* Barra de Filtros */}
       <div className="filter-bar glass-panel" style={{ padding: '15px 20px', borderRadius: 'var(--radius-sm)' }}>
         <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', flex: 1 }}>
@@ -852,5 +959,69 @@ export default function Dashboard({ user, profile, showToast }) {
         </div>
       )}
     </div>
+
+    {/* Popover de histórico da seleção */}
+    {teamPopover && (
+      <div
+        ref={popoverRef}
+        className="team-history-popover"
+        style={{ top: teamPopover.y, left: teamPopover.x }}
+      >
+        {/* Header */}
+        <div className="thp-header">
+          <span className="thp-title">📋 {teamPopover.teamName}</span>
+          <button className="thp-close" onClick={() => setTeamPopover(null)}>✕</button>
+        </div>
+
+        {/* Conteúdo */}
+        {teamPopover.loading ? (
+          <div className="thp-loading">
+            <div className="thp-spinner" />
+            <span>Buscando histórico...</span>
+          </div>
+        ) : !teamPopover.data || teamPopover.data.length === 0 ? (
+          <div className="thp-empty">Nenhum jogo encontrado para esta seleção.</div>
+        ) : (
+          <div className="thp-list">
+            <div className="thp-subtitle">Últimos jogos</div>
+            {teamPopover.data.map((ev, i) => {
+              const isHome = ev.strHomeTeam?.toLowerCase() === translateTeamName(teamPopover.teamName).toLowerCase()
+                || ev.strHomeTeam?.toLowerCase() === teamPopover.teamName.toLowerCase();
+              const myScore  = isHome ? parseInt(ev.intHomeScore) : parseInt(ev.intAwayScore);
+              const oppScore = isHome ? parseInt(ev.intAwayScore)  : parseInt(ev.intHomeScore);
+              const opponent = isHome ? ev.strAwayTeam : ev.strHomeTeam;
+              const result   = myScore > oppScore ? 'W' : myScore === oppScore ? 'D' : 'L';
+              const comp     = getCompetitionInfo(ev.strLeague);
+              const dateStr  = ev.dateEvent
+                ? new Date(ev.dateEvent).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                : '';
+              return (
+                <div key={i} className="thp-row">
+                  <span
+                    className="thp-comp-badge"
+                    style={{ '--comp-color': comp.color }}
+                    data-tooltip={comp.label}
+                  >
+                    {comp.emoji}
+                  </span>
+                  <span className="thp-opponent">
+                    {isHome ? 'x ' : 'em '}{opponent}
+                  </span>
+                  <span className="thp-score">
+                    {isNaN(myScore) ? '?' : myScore}–{isNaN(oppScore) ? '?' : oppScore}
+                  </span>
+                  <span className={`thp-result thp-result-${result.toLowerCase()}`}>
+                    {result === 'W' ? '✅ V' : result === 'D' ? '➖ E' : '❌ D'}
+                  </span>
+                  <span className="thp-date">{dateStr}</span>
+                </div>
+              );
+            })}
+            <div className="thp-footer">Fonte: TheSportsDB • Clique fora para fechar</div>
+          </div>
+        )}
+      </div>
+    )}
+    </>
   );
 }
