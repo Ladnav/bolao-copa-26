@@ -19,6 +19,118 @@ const pointsLabel = (pts) => {
   return           { icon: '❌', label: 'Zerou', color: 'var(--error)' };
 };
 
+// -------------------------------------------------------
+// Sistema de Conquistas e Badges
+// Calculado 100% no frontend a partir dos dados existentes
+// -------------------------------------------------------
+const ACHIEVEMENTS = [
+  {
+    id: 'first_guess',
+    icon: '🖣️',
+    name: 'Primeira Pedra',
+    desc: 'Salvou seu primeiro palpite',
+    check: (profile, guesses) => guesses.length >= 1,
+    color: '#94a3b8',
+  },
+  {
+    id: 'guess_20',
+    icon: '📋',
+    name: 'Palpiteiro de Carteirinha',
+    desc: '20 palpites salvos',
+    check: (profile, guesses) => guesses.length >= 20,
+    color: '#60a5fa',
+  },
+  {
+    id: 'guess_48',
+    icon: '🟢',
+    name: 'All-In',
+    desc: 'Palpitou em todos os 48 jogos da fase de grupos',
+    check: (profile, guesses) => guesses.length >= 48,
+    color: '#34d399',
+  },
+  {
+    id: 'first_exact',
+    icon: '⭐',
+    name: 'Craque do Placar',
+    desc: 'Acertou o placar exato pela primeira vez',
+    check: (profile, guesses) => (profile.exact_scores_count || 0) >= 1,
+    color: '#fbbf24',
+  },
+  {
+    id: 'exact_3',
+    icon: '🎩',
+    name: 'Hat-trick de Exatos',
+    desc: '3 placares exatos acertados',
+    check: (profile, guesses) => (profile.exact_scores_count || 0) >= 3,
+    color: '#f59e0b',
+  },
+  {
+    id: 'exact_10',
+    icon: '🔟',
+    name: 'Décuplo Exato',
+    desc: '10 placares exatos acertados',
+    check: (profile, guesses) => (profile.exact_scores_count || 0) >= 10,
+    color: '#ef4444',
+  },
+  {
+    id: 'winner_5',
+    icon: '🎯',
+    name: 'Leitor de Jogo',
+    desc: 'Acertou o vencedor em 5 jogos (pts ≥ 3)',
+    check: (profile, guesses) => guesses.filter(g => g.points_awarded >= 3).length >= 5,
+    color: '#a78bfa',
+  },
+  {
+    id: 'winner_10',
+    icon: '🔮',
+    name: 'Vidente',
+    desc: 'Acertou o vencedor em 10 jogos',
+    check: (profile, guesses) => guesses.filter(g => g.points_awarded >= 3).length >= 10,
+    color: '#8b5cf6',
+  },
+  {
+    id: 'pts_50',
+    icon: '📈',
+    name: 'Pontuador',
+    desc: '50 pontos acumulados',
+    check: (profile, guesses) => (profile.total_points || 0) >= 50,
+    color: '#fb923c',
+  },
+  {
+    id: 'pts_100',
+    icon: '🏆',
+    name: 'Centenário',
+    desc: '100 pontos acumulados',
+    check: (profile, guesses) => (profile.total_points || 0) >= 100,
+    color: '#f59e0b',
+  },
+  {
+    id: 'super_scored',
+    icon: '💥',
+    name: 'Super Estrela',
+    desc: 'Pontuou com um Super Palpite',
+    check: (profile, guesses) => guesses.some(g => g.is_super && g.points_awarded > 0),
+    color: '#fde68a',
+  },
+  {
+    id: 'underdog',
+    icon: '🐴',
+    name: 'Azaraõ',
+    desc: 'Acertou um placar exato com diferença de gols ≥ 3',
+    check: (profile, guesses) => guesses.some(g =>
+      g.points_awarded === 10 &&
+      g.matches &&
+      Math.abs((g.matches.home_score || 0) - (g.matches.away_score || 0)) >= 3
+    ),
+    color: '#f472b6',
+  },
+];
+
+const computeAchievements = (profile, guesses) => {
+  if (!profile || !guesses) return [];
+  return ACHIEVEMENTS.filter(a => a.check(profile, guesses));
+};
+
 export default function Ranking({ currentUser, showToast }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +184,7 @@ export default function Ranking({ currentUser, showToast }) {
           home_guess,
           away_guess,
           points_awarded,
+          is_super,
           match_id,
           matches (
             id,
@@ -268,8 +381,32 @@ export default function Ranking({ currentUser, showToast }) {
               </div>
             ) : (() => {
               const s = summarize(detailGuesses);
+              const earned = computeAchievements(detailUser, detailGuesses);
               return (
                 <>
+                  {/* Seção de Conquistas */}
+                  <div className="achievements-section">
+                    <div className="achievements-header">
+                      <span>🏆</span>
+                      <span>Conquistas</span>
+                      <span className="achievements-count">{earned.length}/{ACHIEVEMENTS.length}</span>
+                    </div>
+                    {earned.length === 0 ? (
+                      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                        Nenhuma conquista ainda — continue palpitando!
+                      </p>
+                    ) : (
+                      <div className="achievements-grid">
+                        {earned.map(a => (
+                          <div key={a.id} className="achievement-badge" style={{ '--badge-color': a.color }} title={a.desc}>
+                            <span className="achievement-icon">{a.icon}</span>
+                            <span className="achievement-name">{a.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Resumo de categorias */}
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
                     {[
@@ -312,6 +449,7 @@ export default function Ranking({ currentUser, showToast }) {
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>x</span>
                             <span style={{ fontSize: '0.82rem', fontWeight: '600' }}>{m?.away_team}</span>
                             {renderFlag(m?.away_team_flag)}
+                            {g.is_super && <span style={{ color: 'var(--accent-gold)', fontSize: '0.75rem' }} title="Super Palpite">⭐</span>}
                           </div>
 
                           {/* Resultado oficial */}

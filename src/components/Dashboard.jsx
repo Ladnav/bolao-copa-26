@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Search, Save, Eye, Calendar, Clock, Lock, Pencil, CheckCircle2 } from 'lucide-react';
+import { Search, Save, Eye, Calendar, Clock, Lock, Pencil, CheckCircle2, BellOff } from 'lucide-react';
 
 const renderFlag = (flag) => {
   if (!flag) return <span className="team-flag">🏳️</span>;
@@ -18,6 +18,8 @@ export default function Dashboard({ user, profile, showToast }) {
   const [groupFilter, setGroupFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [savingId, setSavingId] = useState(null);
+  // Filtro de palpites pendentes (jogos sem palpite ainda)
+  const [showPendingOnly, setShowPendingOnly] = useState(false);
   // Conjunto de matchIds atualmente em modo de edição (mesmo que já tenham palpite salvo)
   const [editingMatches, setEditingMatches] = useState(new Set());
 
@@ -361,6 +363,15 @@ export default function Dashboard({ user, profile, showToast }) {
     return matchRound && matchGroup && searchMatch;
   });
 
+  // Conta jogos pendentes: abertos e sem palpite salvo
+  const isPending = (match) => !isGuessClosed(match) && !userGuesses[match.id]?.isSaved;
+  const pendingCount = filteredMatches.filter(isPending).length;
+
+  // Aplica filtro de pendentes se ativo
+  const displayedMatches = showPendingOnly
+    ? filteredMatches.filter(isPending)
+    : filteredMatches;
+
   const renderMatchCard = (match) => {
     const guessClosed = isGuessClosed(match);
     const guess = userGuesses[match.id] || { home_guess: '', away_guess: '', points_awarded: null };
@@ -570,7 +581,8 @@ export default function Dashboard({ user, profile, showToast }) {
             value={roundFilter}
             onChange={(e) => {
               setRoundFilter(e.target.value);
-              setGroupFilter('all'); // Reseta grupo ao mudar fase
+              setGroupFilter('all');
+              setShowPendingOnly(false); // Reseta filtro pendentes ao mudar fase
             }}
           >
             <option value="Fase de Grupos">Fase de Grupos</option>
@@ -606,6 +618,25 @@ export default function Dashboard({ user, profile, showToast }) {
               style={{ paddingLeft: '38px' }}
             />
           </div>
+
+          {/* Botão de filtro: apenas jogos sem palpite */}
+          {user && (
+            <button
+              className={`pending-filter-btn ${showPendingOnly ? 'active' : ''} ${pendingCount > 0 && !showPendingOnly ? 'has-pending' : ''}`}
+              onClick={() => setShowPendingOnly(prev => !prev)}
+              title={showPendingOnly ? 'Mostrar todos os jogos' : 'Mostrar apenas jogos sem palpite'}
+            >
+              <BellOff size={14} />
+              {showPendingOnly ? 'Todos os jogos' : (
+                <>
+                  Sem palpite
+                  {pendingCount > 0 && (
+                    <span className="pending-count-badge">{pendingCount}</span>
+                  )}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -687,9 +718,16 @@ export default function Dashboard({ user, profile, showToast }) {
               : 'O banco de dados do bolão está vazio! Peça ao administrador do bolão para semear as partidas da Copa do Mundo e dar o pontapé inicial.'}
           </p>
         </div>
-      ) : filteredMatches.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
-          Nenhum jogo encontrado para os filtros selecionados.
+      ) : displayedMatches.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary)' }}>
+          {showPendingOnly
+            ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '2.5rem' }}>✅</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--accent-green)' }}>Tudo em dia!</span>
+                <span style={{ fontSize: '0.88rem' }}>Você já palpitou em todos os jogos abertos desta fase.</span>
+              </div>
+            : 'Nenhum jogo encontrado para os filtros selecionados.'
+          }
         </div>
       ) : roundFilter === 'Fase de Grupos' ? (
         // Renderiza jogos agrupados por rodadas para Fase de Grupos
@@ -700,7 +738,7 @@ export default function Dashboard({ user, profile, showToast }) {
             '3ª Rodada': []
           };
 
-          filteredMatches.forEach(match => {
+          displayedMatches.forEach(match => {
             const idx = ((match.id - 1) % 6) + 1;
             if (idx === 1 || idx === 2) {
               groupedMatches['1ª Rodada'].push(match);
@@ -737,7 +775,7 @@ export default function Dashboard({ user, profile, showToast }) {
       ) : (
         // Comportamento padrão para as demais fases (mata-mata)
         <div className="cards-grid">
-          {filteredMatches.map(renderMatchCard)}
+          {displayedMatches.map(renderMatchCard)}
         </div>
       )}
 

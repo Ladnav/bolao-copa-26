@@ -833,6 +833,66 @@ select.select-filter option,
     max-width: 100%;
     width: 100%;
   }
+
+  /* Botão de pendentes ocupa a largura toda em mobile */
+  .pending-filter-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 0.85rem;
+  }
+
+  /* Conquistas: badges em grid de 2 colunas no mobile */
+  .achievements-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .achievement-badge {
+    justify-content: flex-start;
+    padding: 6px 10px;
+  }
+
+  .achievement-name {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Modal de detalhes mais compacto em mobile */
+  .achievements-section {
+    padding: 12px;
+  }
+}
+
+/* ============================
+   Mobile pequeno: até 480px
+   ============================ */
+@media (max-width: 480px) {
+  /* Grid de conquistas em coluna única em telas muito pequenas */
+  .achievements-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .achievement-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Badge de contador de pendentes levemente maior para toque */
+  .pending-count-badge {
+    min-width: 22px;
+    height: 22px;
+    font-size: 0.78rem;
+  }
+
+  /* Resumo de categorias no modal: 3 colunas em telas pequenas */
+  .modal-content > div > div[style*="flex"] {
+    gap: 5px;
+  }
 }
 
 /* Image flag styling */
@@ -1030,6 +1090,138 @@ input[type="datetime-local"]:focus {
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
+
+/* =========================================
+   Botão de Filtro — Palpites Pendentes
+   ========================================= */
+.pending-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  white-space: nowrap;
+}
+
+.pending-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+/* Estado com pendentes: borda âmbar pulsante */
+.pending-filter-btn.has-pending {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: var(--accent-gold);
+  background: rgba(245, 158, 11, 0.06);
+  animation: pending-pulse 2.5s infinite ease-in-out;
+}
+
+@keyframes pending-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+  50%  { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* Estado ativo (filtro ligado): verde */
+.pending-filter-btn.active {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.08);
+  animation: none;
+}
+
+/* Badge com contador de pendentes */
+.pending-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--accent-gold);
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* =========================================
+   Seção de Conquistas e Badges
+   ========================================= */
+.achievements-section {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+}
+
+.achievements-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  font-family: var(--font-title);
+}
+
+.achievements-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.achievements-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.achievement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--badge-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color) 35%, transparent);
+  cursor: default;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.achievement-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--badge-color) 25%, transparent);
+}
+
+.achievement-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.achievement-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--badge-color);
+  letter-spacing: 0.01em;
+}
+
 
 
 
