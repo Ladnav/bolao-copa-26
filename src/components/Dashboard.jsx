@@ -982,7 +982,7 @@ export default function Dashboard({ user, profile, showToast }) {
           <div className="thp-empty">Nenhum jogo encontrado para esta seleção.</div>
         ) : (
           <div className="thp-list">
-            <div className="thp-subtitle">Últimos jogos</div>
+            <div className="thp-subtitle">Último jogo</div>
             {teamPopover.data.map((ev, i) => {
               const isHome = ev.strHomeTeam?.toLowerCase() === translateTeamName(teamPopover.teamName).toLowerCase()
                 || ev.strHomeTeam?.toLowerCase() === teamPopover.teamName.toLowerCase();
