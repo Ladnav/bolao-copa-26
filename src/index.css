@@ -1222,6 +1222,120 @@ input[type="datetime-local"]:focus {
   letter-spacing: 0.01em;
 }
 
+/* =========================================
+   Badges na Tabela de Classificação
+   ========================================= */
+
+/* Pílula de emoji exibida na linha da tabela */
+.rank-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.82rem;
+  background: color-mix(in srgb, var(--badge-color, #94a3b8) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color, #94a3b8) 40%, transparent);
+  cursor: default;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.rank-badge-pill:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--badge-color, #94a3b8) 50%, transparent);
+  z-index: 10;
+}
+
+/* Botão "+" indicando mais conquistas no modal */
+.rank-badge-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  cursor: default;
+  position: relative;
+}
+
+/* =========================================
+   Tooltip Customizada (data-tooltip)
+   Funciona em .rank-badge-pill, .rank-badge-more e .achievement-badge
+   ========================================= */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(15, 20, 35, 0.97);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 9999;
+  max-width: 220px;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.4;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Seta da tooltip */
+[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  border: 5px solid transparent;
+  border-top-color: rgba(15, 20, 35, 0.97);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 9999;
+}
+
+[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Garante que tooltip não saia da tela à esquerda */
+.rank-badge-pill:first-child[data-tooltip]::after,
+.rank-badge-pill:first-child[data-tooltip]::before {
+  left: 0;
+  transform: translateX(0) translateY(4px);
+}
+.rank-badge-pill:first-child[data-tooltip]:hover::after,
+.rank-badge-pill:first-child[data-tooltip]:hover::before {
+  transform: translateX(0) translateY(0);
+}
+
+
 
 
 

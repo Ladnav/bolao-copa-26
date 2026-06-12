@@ -131,6 +131,56 @@ const computeAchievements = (profile, guesses) => {
   return ACHIEVEMENTS.filter(a => a.check(profile, guesses));
 };
 
+// Conquistas calculáveis apenas com dados do profile (sem precisar dos palpites)
+// Usadas para exibir na tabela de ranking sem queries extras
+const PROFILE_ACHIEVEMENTS = [
+  {
+    id: 'first_exact',
+    icon: '⭐',
+    name: 'Craque do Placar',
+    desc: 'Acertou o placar exato pela primeira vez',
+    check: (profile) => (profile.exact_scores_count || 0) >= 1,
+    color: '#fbbf24',
+  },
+  {
+    id: 'exact_3',
+    icon: '🎩',
+    name: 'Hat-trick de Exatos',
+    desc: '3 placares exatos acertados',
+    check: (profile) => (profile.exact_scores_count || 0) >= 3,
+    color: '#f59e0b',
+  },
+  {
+    id: 'exact_10',
+    icon: '🔟',
+    name: 'Décuplo Exato',
+    desc: '10 placares exatos acertados',
+    check: (profile) => (profile.exact_scores_count || 0) >= 10,
+    color: '#ef4444',
+  },
+  {
+    id: 'pts_50',
+    icon: '📈',
+    name: 'Pontuador',
+    desc: '50 pontos acumulados',
+    check: (profile) => (profile.total_points || 0) >= 50,
+    color: '#fb923c',
+  },
+  {
+    id: 'pts_100',
+    icon: '🏆',
+    name: 'Centenário',
+    desc: '100 pontos acumulados',
+    check: (profile) => (profile.total_points || 0) >= 100,
+    color: '#f59e0b',
+  },
+];
+
+const computeProfileAchievements = (profile) => {
+  if (!profile) return [];
+  return PROFILE_ACHIEVEMENTS.filter(a => a.check(profile));
+};
+
 export default function Ranking({ currentUser, showToast }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -308,10 +358,37 @@ export default function Ranking({ currentUser, showToast }) {
                       <div className="avatar-placeholder" style={{ width: '30px', height: '30px', fontSize: '0.85rem', border: isSelf ? '2px solid var(--accent-green)' : '1px solid var(--card-border)' }}>
                         {(profile.username || 'U')[0].toUpperCase()}
                       </div>
-                      <span>
-                        @{profile.username || 'usuário'}{' '}
-                        {isSelf && <span style={{ fontSize: '0.75rem', color: 'var(--accent-green)', fontWeight: 'bold' }}>(Você)</span>}
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span>
+                          @{profile.username || 'usuário'}{' '}
+                          {isSelf && <span style={{ fontSize: '0.75rem', color: 'var(--accent-green)', fontWeight: 'bold' }}>(Você)</span>}
+                        </span>
+                        {/* Badges de perfil na tabela */}
+                        {(() => {
+                          const profileBadges = computeProfileAchievements(profile);
+                          if (profileBadges.length === 0) return null;
+                          return (
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {profileBadges.map(a => (
+                                <span
+                                  key={a.id}
+                                  className="rank-badge-pill"
+                                  style={{ '--badge-color': a.color }}
+                                  data-tooltip={`${a.name} — ${a.desc}`}
+                                >
+                                  {a.icon}
+                                </span>
+                              ))}
+                              <span
+                                className="rank-badge-more"
+                                data-tooltip="Clique em 'Ver' para ver todas as conquistas"
+                              >
+                                +
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td style={{ textAlign: 'center' }} className="ranking-details">
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
@@ -398,7 +475,7 @@ export default function Ranking({ currentUser, showToast }) {
                     ) : (
                       <div className="achievements-grid">
                         {earned.map(a => (
-                          <div key={a.id} className="achievement-badge" style={{ '--badge-color': a.color }} title={a.desc}>
+                          <div key={a.id} className="achievement-badge" style={{ '--badge-color': a.color }} data-tooltip={`${a.name} — ${a.desc}`}>
                             <span className="achievement-icon">{a.icon}</span>
                             <span className="achievement-name">{a.name}</span>
                           </div>
