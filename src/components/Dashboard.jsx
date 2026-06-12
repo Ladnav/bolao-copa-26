@@ -79,49 +79,8 @@ export default function Dashboard({ user, profile, showToast }) {
     const x = Math.min(anchorRect.left, window.innerWidth - 320);
     const y = anchorRect.bottom + window.scrollY + 8;
 
-    // Cache hit
-    if (teamHistoryCache.current.has(teamName)) {
-      setTeamPopover({ teamName, x, y, data: teamHistoryCache.current.get(teamName), loading: false });
-      return;
-    }
-
-    setTeamPopover({ teamName, x, y, data: null, loading: true });
-
-    try {
-      const enName = translateTeamName(teamName);
-      const BASE  = 'https://www.thesportsdb.com/api/v1/json/3';
-
-      // 1. Busca ID da seleção
-      const searchRes = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(enName)}`);
-      const searchJson = await searchRes.json();
-      // Filtra apenas times de futebol masculino sênior (sem U17, U20, Feminino)
-      const team = (searchJson.teams || []).find(t =>
-        t.strSport === 'Soccer' &&
-        !t.strTeam.toLowerCase().includes('u17') &&
-        !t.strTeam.toLowerCase().includes('u20') &&
-        !t.strTeam.toLowerCase().includes('u23') &&
-        !t.strTeam.toLowerCase().includes('women') &&
-        !t.strTeam.toLowerCase().includes('female')
-      );
-
-      if (!team) {
-        teamHistoryCache.current.set(teamName, []);
-        setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: [], loading: false } : prev);
-        return;
-      }
-
-      // 2. Busca últimos jogos
-      const eventsRes = await fetch(`${BASE}/eventslast.php?id=${team.idTeam}`);
-      const eventsJson = await eventsRes.json();
-      const results = (eventsJson.results || []).slice(0, 5).reverse(); // mais antigo → mais recente
-
-      teamHistoryCache.current.set(teamName, results);
-      setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: results, loading: false } : prev);
-    } catch (err) {
-      console.error('Erro ao buscar histórico:', err);
-      teamHistoryCache.current.set(teamName, []);
-      setTeamPopover(prev => prev?.teamName === teamName ? { ...prev, data: [], loading: false } : prev);
-    }
+    // Apenas abre o popover, os dados agora vêm apenas do estado local (matches)
+    setTeamPopover({ teamName, x, y, loading: false });
   }, [teamPopover]);
 
   // Função para retornar quais super palpites estão ativos e em qual jogo para a fase selecionada
@@ -1039,47 +998,54 @@ export default function Dashboard({ user, profile, showToast }) {
                 </div>
               </div>
 
-              {/* Último jogo (API) */}
+              {/* Jogos na Copa (Local) */}
               <div className="thp-list">
-                <div className="thp-subtitle">Último jogo (Geral)</div>
-                {!teamPopover.data || teamPopover.data.length === 0 ? (
-                  <div className="thp-empty" style={{ padding: '10px 0', fontSize: '0.8rem' }}>Nenhum jogo recente encontrado.</div>
-                ) : (
-                  teamPopover.data.map((ev, i) => {
-              const isHome = ev.strHomeTeam?.toLowerCase() === translateTeamName(teamPopover.teamName).toLowerCase()
-                || ev.strHomeTeam?.toLowerCase() === teamPopover.teamName.toLowerCase();
-              const myScore  = isHome ? parseInt(ev.intHomeScore) : parseInt(ev.intAwayScore);
-              const oppScore = isHome ? parseInt(ev.intAwayScore)  : parseInt(ev.intHomeScore);
-              const opponent = isHome ? ev.strAwayTeam : ev.strHomeTeam;
-              const result   = myScore > oppScore ? 'W' : myScore === oppScore ? 'D' : 'L';
-              const comp     = getCompetitionInfo(ev.strLeague);
-              const dateStr  = ev.dateEvent
-                ? new Date(ev.dateEvent).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                : '';
-              return (
-                <div key={i} className="thp-row">
-                  <span
-                    className="thp-comp-badge"
-                    style={{ '--comp-color': comp.color }}
-                    data-tooltip={comp.label}
-                  >
-                    {comp.emoji}
-                  </span>
-                  <span className="thp-opponent">
-                    {isHome ? 'x ' : 'em '}{opponent}
-                  </span>
-                  <span className="thp-score">
-                    {isNaN(myScore) ? '?' : myScore}–{isNaN(oppScore) ? '?' : oppScore}
-                  </span>
-                  <span className={`thp-result thp-result-${result.toLowerCase()}`}>
-                    {result === 'W' ? '✅ V' : result === 'D' ? '➖ E' : '❌ D'}
-                  </span>
-                  <span className="thp-date">{dateStr}</span>
-                </div>
-              );
-            })
-            )}
-                <div className="thp-footer">Fonte: TheSportsDB • Clique fora para fechar</div>
+                <div className="thp-subtitle">Jogos da Copa</div>
+                {(() => {
+                  const teamMatches = matches
+                    .filter(m => m.home_team === teamPopover.teamName || m.away_team === teamPopover.teamName)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                  if (teamMatches.length === 0) {
+                    return <div className="thp-empty" style={{ padding: '10px 0', fontSize: '0.8rem' }}>Nenhum jogo cadastrado.</div>;
+                  }
+
+                  return teamMatches.map((m, i) => {
+                    const isHome = m.home_team === teamPopover.teamName;
+                    const opponent = isHome ? m.away_team : m.home_team;
+                    const finished = m.status === 'finished';
+                    let resultHtml = <span className="thp-result" style={{ color: '#888' }}>⏳</span>;
+                    let scoreHtml = <span className="thp-score" style={{ color: '#888' }}>?–?</span>;
+                    
+                    if (finished) {
+                      const myScore = isHome ? m.home_score : m.away_score;
+                      const oppScore = isHome ? m.away_score : m.home_score;
+                      const result = myScore > oppScore ? 'W' : myScore === oppScore ? 'D' : 'L';
+                      
+                      scoreHtml = <span className="thp-score">{myScore}–{oppScore}</span>;
+                      resultHtml = <span className={`thp-result thp-result-${result.toLowerCase()}`}>
+                        {result === 'W' ? '✅ V' : result === 'D' ? '➖ E' : '❌ D'}
+                      </span>;
+                    }
+                    
+                    const dateStr = new Date(m.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    
+                    return (
+                      <div key={i} className="thp-row">
+                        <span className="thp-comp-badge" style={{ '--comp-color': '#10b981' }} data-tooltip={m.round}>
+                          🏆
+                        </span>
+                        <span className="thp-opponent" title={opponent}>
+                          {isHome ? 'x ' : 'em '}{opponent}
+                        </span>
+                        {scoreHtml}
+                        {resultHtml}
+                        <span className="thp-date">{dateStr}</span>
+                      </div>
+                    );
+                  });
+                })()}
+                <div className="thp-footer">Fonte: Base Local da Copa • Clique fora para fechar</div>
               </div>
             </div>
           );
