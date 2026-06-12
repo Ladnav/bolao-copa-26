@@ -88,11 +88,10 @@ export default function Dashboard({ user, profile, showToast }) {
 
     try {
       const enName = translateTeamName(teamName);
-      const PROXY = 'https://corsproxy.io/?';
       const BASE  = 'https://www.thesportsdb.com/api/v1/json/3';
 
       // 1. Busca ID da seleção
-      const searchRes = await fetch(`${PROXY}${encodeURIComponent(`${BASE}/searchteams.php?t=${enName}`)}`);
+      const searchRes = await fetch(`${BASE}/searchteams.php?t=${encodeURIComponent(enName)}`);
       const searchJson = await searchRes.json();
       // Filtra apenas times de futebol masculino sênior (sem U17, U20, Feminino)
       const team = (searchJson.teams || []).find(t =>
@@ -111,7 +110,7 @@ export default function Dashboard({ user, profile, showToast }) {
       }
 
       // 2. Busca últimos jogos
-      const eventsRes = await fetch(`${PROXY}${encodeURIComponent(`${BASE}/eventslast.php?id=${team.idTeam}`)}`);
+      const eventsRes = await fetch(`${BASE}/eventslast.php?id=${team.idTeam}`);
       const eventsJson = await eventsRes.json();
       const results = (eventsJson.results || []).slice(0, 5).reverse(); // mais antigo → mais recente
 
