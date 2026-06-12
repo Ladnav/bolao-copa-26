@@ -1004,7 +1004,7 @@ export default function Dashboard({ user, profile, showToast }) {
                 {(() => {
                   const teamMatches = matches
                     .filter(m => m.home_team === teamPopover.teamName || m.away_team === teamPopover.teamName)
-                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+                    .sort((a, b) => new Date(b.match_date) - new Date(a.match_date));
 
                   if (teamMatches.length === 0) {
                     return <div className="thp-empty" style={{ padding: '10px 0', fontSize: '0.8rem' }}>Nenhum jogo cadastrado.</div>;
@@ -1028,7 +1028,7 @@ export default function Dashboard({ user, profile, showToast }) {
                       </span>;
                     }
                     
-                    const dateStr = new Date(m.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    const dateStr = m.match_date ? new Date(m.match_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '-';
                     
                     return (
                       <div key={i} className="thp-row">
