@@ -1082,7 +1082,6 @@ export default function Dashboard({ user, profile, showToast }) {
             </div>
           );
         })()}
-        )}
       </div>
     )}
     </>
