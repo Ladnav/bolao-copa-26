@@ -1335,6 +1335,63 @@ input[type="datetime-local"]:focus {
   transform: translateX(0) translateY(0);
 }
 
+/* =========================================
+   Indicadores de Movimentação no Ranking
+   ========================================= */
+.rank-movement {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.3;
+  cursor: default;
+  position: relative;
+  animation: fade-in-up 0.4s ease both;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rank-up {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.rank-down {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+
+.rank-stable {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rank-new {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  font-size: 0.6rem;
+}
+
+/* Mobile: indicadores menores */
+@media (max-width: 480px) {
+  .rank-movement {
+    font-size: 0.58rem;
+    padding: 1px 4px;
+  }
+}
+
+
 
 
 

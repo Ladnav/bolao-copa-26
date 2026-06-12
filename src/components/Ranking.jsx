@@ -184,6 +184,9 @@ const computeProfileAchievements = (profile) => {
 export default function Ranking({ currentUser, showToast }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Movimentação de posicões: { userId: { delta: number, isNew: bool } }
+  const [rankMovement, setRankMovement] = useState({});
+  const [snapshotDate, setSnapshotDate] = useState(null);
 
   // Modal de detalhes
   const [detailUser, setDetailUser] = useState(null);
@@ -213,7 +216,48 @@ export default function Ranking({ currentUser, showToast }) {
         .order('pts7_count', { ascending: false });
 
       if (error) throw error;
-      setLeaderboard(data || []);
+
+      const newData = data || [];
+      setLeaderboard(newData);
+
+      // --- Cálculo de movimentação via localStorage ---
+      const SNAPSHOT_KEY = 'bolao_ranking_snapshot';
+      let movement = {};
+      let savedAt = null;
+
+      try {
+        const raw = localStorage.getItem(SNAPSHOT_KEY);
+        if (raw) {
+          const snapshot = JSON.parse(raw);
+          savedAt = snapshot.savedAt;
+          // Mapa antigo: { userId -> rank }
+          const oldRanks = snapshot.ranks || {};
+
+          newData.forEach((profile, index) => {
+            const currentRank = index + 1;
+            const previousRank = oldRanks[profile.id];
+            if (previousRank === undefined) {
+              movement[profile.id] = { delta: null, isNew: true };
+            } else {
+              movement[profile.id] = { delta: previousRank - currentRank, isNew: false };
+            }
+          });
+        }
+        // Salva novo snapshot
+        const newRanks = {};
+        newData.forEach((profile, index) => {
+          newRanks[profile.id] = index + 1;
+        });
+        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          ranks: newRanks,
+        }));
+      } catch (lsErr) {
+        console.warn('Erro ao ler/salvar snapshot do ranking:', lsErr);
+      }
+
+      setRankMovement(movement);
+      setSnapshotDate(savedAt);
     } catch (err) {
       console.error('Erro ao carregar ranking:', err);
       showToast('Erro ao carregar tabela de líderes: ' + err.message, 'error');
@@ -349,10 +393,35 @@ export default function Ranking({ currentUser, showToast }) {
                 return (
                   <tr key={profile.id} className={`ranking-row ${isSelf ? 'current-user' : ''}`}>
                     <td className={`ranking-position ${posClass}`}>
-                      {position === 1 ? '🥇 1º' :
-                       position === 2 ? '🥈 2º' :
-                       position === 3 ? '🥉 3º' :
-                       `${position}º`}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                        <span>
+                          {position === 1 ? '🥇 1º' :
+                           position === 2 ? '🥈 2º' :
+                           position === 3 ? '🥉 3º' :
+                           `${position}º`}
+                        </span>
+                        {/* Indicador de movimentação */}
+                        {(() => {
+                          const mv = rankMovement[profile.id];
+                          if (!mv) return null;
+                          if (mv.isNew) return (
+                            <span className="rank-movement rank-new" data-tooltip="Primeira vez no ranking!">NOVO</span>
+                          );
+                          if (mv.delta > 0) return (
+                            <span className="rank-movement rank-up" data-tooltip={`Subiu ${mv.delta} posição${mv.delta > 1 ? 'ões' : ''} desde a última atualização`}>
+                              ▲ {mv.delta}
+                            </span>
+                          );
+                          if (mv.delta < 0) return (
+                            <span className="rank-movement rank-down" data-tooltip={`Caiu ${Math.abs(mv.delta)} posição${Math.abs(mv.delta) > 1 ? 'ões' : ''} desde a última atualização`}>
+                              ▼ {Math.abs(mv.delta)}
+                            </span>
+                          );
+                          return (
+                            <span className="rank-movement rank-stable" data-tooltip="Manteve a posição">&#8212;</span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="ranking-username">
                       <div className="avatar-placeholder" style={{ width: '30px', height: '30px', fontSize: '0.85rem', border: isSelf ? '2px solid var(--accent-green)' : '1px solid var(--card-border)' }}>
@@ -417,12 +486,26 @@ export default function Ranking({ currentUser, showToast }) {
         </div>
       )}
 
-      <div style={{ marginTop: '25px', display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center' }} className="glass-panel">
+      <div style={{ marginTop: '25px', display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }} className="glass-panel">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 15px', borderRadius: 'var(--radius-sm)' }}>
           <Activity size={16} color="var(--accent-green)" />
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             <strong>Clique em "Ver"</strong> para ver o detalhamento dos pontos de cada participante.
           </span>
+        </div>
+        {snapshotDate && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>📊 Comparação com: </span>
+            <strong style={{ color: 'var(--text-secondary)' }}>
+              {new Date(snapshotDate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </strong>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 14px', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--accent-green)', fontWeight: '700' }}>▲ Subiu</span>
+          <span style={{ color: 'var(--error)', fontWeight: '700' }}>▼ Caiu</span>
+          <span style={{ color: 'var(--text-muted)', fontWeight: '700' }}>&#8212; Estável</span>
+          <span style={{ background: 'rgba(59,130,246,0.2)', color: '#93c5fd', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', fontSize: '0.68rem' }}>NOVO</span>
         </div>
       </div>
 
