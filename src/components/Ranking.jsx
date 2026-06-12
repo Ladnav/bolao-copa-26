@@ -168,12 +168,20 @@ const PROFILE_ACHIEVEMENTS = [
   },
   {
     id: 'pts_100',
-    icon: '🏆',
+    icon: '💯',
     name: 'Centenário',
     desc: '100 pontos acumulados',
     check: (profile) => (profile.total_points || 0) >= 100,
-    color: '#f59e0b',
+    color: '#10b981',
   },
+  {
+    id: 'pts7_master',
+    icon: '⚖️',
+    name: 'Rei do Saldo',
+    desc: 'Acertou o saldo de gols 5 vezes',
+    check: (profile) => (profile.pts7_count || 0) >= 5,
+    color: '#8b5cf6',
+  }
 ];
 
 const computeProfileAchievements = (profile) => {
