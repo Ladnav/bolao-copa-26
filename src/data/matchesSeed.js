@@ -135,124 +135,92 @@ const groupsData = {
   ]
 };
 
-// Gerador sistemático de partidas
+// Lista estática de datas/horários oficiais convertidos para Brasília Time (GMT-3)
+const matchesData = [
+  { id: 1, group: 'A', home: 'México', away: 'África do Sul', time: '2026-06-11T19:00:00Z' },
+  { id: 2, group: 'A', home: 'Coreia do Sul', away: 'República Tcheca', time: '2026-06-12T02:00:00Z' },
+  { id: 3, group: 'A', home: 'México', away: 'Coreia do Sul', time: '2026-06-19T01:00:00Z' },
+  { id: 4, group: 'A', home: 'África do Sul', away: 'República Tcheca', time: '2026-06-18T16:00:00Z' },
+  { id: 5, group: 'A', home: 'República Tcheca', away: 'México', time: '2026-06-25T01:00:00Z' },
+  { id: 6, group: 'A', home: 'África do Sul', away: 'Coreia do Sul', time: '2026-06-25T01:00:00Z' },
+  { id: 7, group: 'B', home: 'Canadá', away: 'Bósnia e Herzegovina', time: '2026-06-12T19:00:00Z' },
+  { id: 8, group: 'B', home: 'Catar', away: 'Suíça', time: '2026-06-13T19:00:00Z' },
+  { id: 9, group: 'B', home: 'Canadá', away: 'Catar', time: '2026-06-18T22:00:00Z' },
+  { id: 10, group: 'B', home: 'Bósnia e Herzegovina', away: 'Suíça', time: '2026-06-18T19:00:00Z' },
+  { id: 11, group: 'B', home: 'Suíça', away: 'Canadá', time: '2026-06-24T19:00:00Z' },
+  { id: 12, group: 'B', home: 'Bósnia e Herzegovina', away: 'Catar', time: '2026-06-24T19:00:00Z' },
+  { id: 13, group: 'C', home: 'Brasil', away: 'Marrocos', time: '2026-06-13T22:00:00Z' },
+  { id: 14, group: 'C', home: 'Haiti', away: 'Escócia', time: '2026-06-14T01:00:00Z' },
+  { id: 15, group: 'C', home: 'Brasil', away: 'Haiti', time: '2026-06-20T00:30:00Z' },
+  { id: 16, group: 'C', home: 'Marrocos', away: 'Escócia', time: '2026-06-19T22:00:00Z' },
+  { id: 17, group: 'C', home: 'Escócia', away: 'Brasil', time: '2026-06-24T22:00:00Z' },
+  { id: 18, group: 'C', home: 'Marrocos', away: 'Haiti', time: '2026-06-24T22:00:00Z' },
+  { id: 19, group: 'D', home: 'Estados Unidos', away: 'Paraguai', time: '2026-06-13T01:00:00Z' },
+  { id: 20, group: 'D', home: 'Austrália', away: 'Turquia', time: '2026-06-14T04:00:00Z' },
+  { id: 21, group: 'D', home: 'Estados Unidos', away: 'Austrália', time: '2026-06-19T19:00:00Z' },
+  { id: 22, group: 'D', home: 'Paraguai', away: 'Turquia', time: '2026-06-20T03:00:00Z' },
+  { id: 23, group: 'D', home: 'Turquia', away: 'Estados Unidos', time: '2026-06-26T02:00:00Z' },
+  { id: 24, group: 'D', home: 'Paraguai', away: 'Austrália', time: '2026-06-26T02:00:00Z' },
+  { id: 25, group: 'E', home: 'Alemanha', away: 'Curaçao', time: '2026-06-14T17:00:00Z' },
+  { id: 26, group: 'E', home: 'Costa do Marfim', away: 'Equador', time: '2026-06-14T23:00:00Z' },
+  { id: 27, group: 'E', home: 'Alemanha', away: 'Costa do Marfim', time: '2026-06-20T20:00:00Z' },
+  { id: 28, group: 'E', home: 'Curaçao', away: 'Equador', time: '2026-06-21T00:00:00Z' },
+  { id: 29, group: 'E', home: 'Equador', away: 'Alemanha', time: '2026-06-25T20:00:00Z' },
+  { id: 30, group: 'E', home: 'Curaçao', away: 'Costa do Marfim', time: '2026-06-25T20:00:00Z' },
+  { id: 31, group: 'F', home: 'Holanda', away: 'Japão', time: '2026-06-14T20:00:00Z' },
+  { id: 32, group: 'F', home: 'Suécia', away: 'Tunísia', time: '2026-06-15T02:00:00Z' },
+  { id: 33, group: 'F', home: 'Holanda', away: 'Suécia', time: '2026-06-20T17:00:00Z' },
+  { id: 34, group: 'F', home: 'Japão', away: 'Tunísia', time: '2026-06-21T04:00:00Z' },
+  { id: 35, group: 'F', home: 'Tunísia', away: 'Holanda', time: '2026-06-25T23:00:00Z' },
+  { id: 36, group: 'F', home: 'Japão', away: 'Suécia', time: '2026-06-25T23:00:00Z' },
+  { id: 37, group: 'G', home: 'Bélgica', away: 'Egito', time: '2026-06-15T19:00:00Z' },
+  { id: 38, group: 'G', home: 'Irã', away: 'Nova Zelândia', time: '2026-06-16T01:00:00Z' },
+  { id: 39, group: 'G', home: 'Bélgica', away: 'Irã', time: '2026-06-21T19:00:00Z' },
+  { id: 40, group: 'G', home: 'Egito', away: 'Nova Zelândia', time: '2026-06-22T01:00:00Z' },
+  { id: 41, group: 'G', home: 'Nova Zelândia', away: 'Bélgica', time: '2026-06-27T03:00:00Z' },
+  { id: 42, group: 'G', home: 'Egito', away: 'Irã', time: '2026-06-27T03:00:00Z' },
+  { id: 43, group: 'H', home: 'Espanha', away: 'Cabo Verde', time: '2026-06-15T16:00:00Z' },
+  { id: 44, group: 'H', home: 'Arábia Saudita', away: 'Uruguai', time: '2026-06-15T22:00:00Z' },
+  { id: 45, group: 'H', home: 'Espanha', away: 'Arábia Saudita', time: '2026-06-21T16:00:00Z' },
+  { id: 46, group: 'H', home: 'Cabo Verde', away: 'Uruguai', time: '2026-06-21T22:00:00Z' },
+  { id: 47, group: 'H', home: 'Uruguai', away: 'Espanha', time: '2026-06-27T00:00:00Z' },
+  { id: 48, group: 'H', home: 'Cabo Verde', away: 'Arábia Saudita', time: '2026-06-27T00:00:00Z' },
+  { id: 49, group: 'I', home: 'França', away: 'Senegal', time: '2026-06-16T19:00:00Z' },
+  { id: 50, group: 'I', home: 'Iraque', away: 'Noruega', time: '2026-06-16T22:00:00Z' },
+  { id: 51, group: 'I', home: 'França', away: 'Iraque', time: '2026-06-22T21:00:00Z' },
+  { id: 52, group: 'I', home: 'Senegal', away: 'Noruega', time: '2026-06-23T00:00:00Z' },
+  { id: 53, group: 'I', home: 'Noruega', away: 'França', time: '2026-06-26T19:00:00Z' },
+  { id: 54, group: 'I', home: 'Senegal', away: 'Iraque', time: '2026-06-26T19:00:00Z' },
+  { id: 55, group: 'J', home: 'Argentina', away: 'Argélia', time: '2026-06-17T01:00:00Z' },
+  { id: 56, group: 'J', home: 'Áustria', away: 'Jordânia', time: '2026-06-17T04:00:00Z' },
+  { id: 57, group: 'J', home: 'Argentina', away: 'Áustria', time: '2026-06-22T17:00:00Z' },
+  { id: 58, group: 'J', home: 'Argélia', away: 'Jordânia', time: '2026-06-23T03:00:00Z' },
+  { id: 59, group: 'J', home: 'Jordânia', away: 'Argentina', time: '2026-06-28T02:00:00Z' },
+  { id: 60, group: 'J', home: 'Argélia', away: 'Áustria', time: '2026-06-28T02:00:00Z' },
+  { id: 61, group: 'K', home: 'Portugal', away: 'RD Congo', time: '2026-06-17T17:00:00Z' },
+  { id: 62, group: 'K', home: 'Uzbequistão', away: 'Colômbia', time: '2026-06-18T02:00:00Z' },
+  { id: 63, group: 'K', home: 'Portugal', away: 'Uzbequistão', time: '2026-06-23T17:00:00Z' },
+  { id: 64, group: 'K', home: 'RD Congo', away: 'Colômbia', time: '2026-06-24T02:00:00Z' },
+  { id: 65, group: 'K', home: 'Colômbia', away: 'Portugal', time: '2026-06-27T23:30:00Z' },
+  { id: 66, group: 'K', home: 'RD Congo', away: 'Uzbequistão', time: '2026-06-27T23:30:00Z' },
+  { id: 67, group: 'L', home: 'Inglaterra', away: 'Croácia', time: '2026-06-17T20:00:00Z' },
+  { id: 68, group: 'L', home: 'Gana', away: 'Panamá', time: '2026-06-17T23:00:00Z' },
+  { id: 69, group: 'L', home: 'Inglaterra', away: 'Gana', time: '2026-06-23T20:00:00Z' },
+  { id: 70, group: 'L', home: 'Croácia', away: 'Panamá', time: '2026-06-23T23:00:00Z' },
+  { id: 71, group: 'L', home: 'Panamá', away: 'Inglaterra', time: '2026-06-27T21:00:00Z' },
+  { id: 72, group: 'L', home: 'Croácia', away: 'Gana', time: '2026-06-27T21:00:00Z' },
+];
+
 export const generateMatches = () => {
-  const makeBrtDate = (day, hour, minute = 0) => {
-    const pad = (num) => String(num).padStart(2, '0');
-    return new Date(`2026-06-${pad(day)}T${pad(hour)}:${pad(minute)}:00-03:00`).toISOString();
-  };
-
-  const groupSchedule = [
-    // Grupo A (0)
-    { r1Day1: 11, r1Hour1: 16, r1Day2: 11, r1Hour2: 19, r2Day1: 18, r2Hour1: 16, r2Day2: 18, r2Hour2: 19, r3Day1: 24, r3Hour1: 16, r3Day2: 24, r3Hour2: 16 },
-    // Grupo B (1)
-    { r1Day1: 12, r1Hour1: 16, r1Day2: 12, r1Hour2: 21, r2Day1: 18, r2Hour1: 16, r2Day2: 18, r2Hour2: 21, r3Day1: 24, r3Hour1: 20, r3Day2: 24, r3Hour2: 20 },
-    // Grupo C (2)
-    { r1Day1: 13, r1Hour1: 19, r1Day2: 13, r1Hour2: 22, r2Day1: 19, r2Hour1: 21, r2Day2: 19, r2Hour2: 19, r3Day1: 24, r3Hour1: 19, r3Day2: 24, r3Hour2: 19, hasMinutes: true },
-    // Grupo D (3)
-    { r1Day1: 12, r1Hour1: 22, r1Day2: 14, r1Hour2: 1, r2Day1: 19, r2Hour1: 16, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 20, r3Day2: 25, r3Hour2: 20 },
-    // Grupo E (4)
-    { r1Day1: 14, r1Hour1: 13, r1Day2: 14, r1Hour2: 19, r2Day1: 20, r2Hour1: 13, r2Day2: 20, r2Hour2: 19, r3Day1: 25, r3Hour1: 16, r3Day2: 25, r3Hour2: 16 },
-    // Grupo F (5)
-    { r1Day1: 14, r1Hour1: 16, r1Day2: 14, r1Hour2: 21, r2Day1: 20, r2Hour1: 16, r2Day2: 20, r2Hour2: 21, r3Day1: 25, r3Hour1: 20, r3Day2: 25, r3Hour2: 20 },
-    // Grupo G (6)
-    { r1Day1: 15, r1Hour1: 13, r1Day2: 15, r1Hour2: 19, r2Day1: 21, r2Hour1: 13, r2Day2: 21, r2Hour2: 19, r3Day1: 26, r3Hour1: 16, r3Day2: 26, r3Hour2: 16 },
-    // Grupo H (7)
-    { r1Day1: 15, r1Hour1: 16, r1Day2: 15, r1Hour2: 21, r2Day1: 21, r2Hour1: 16, r2Day2: 21, r2Hour2: 21, r3Day1: 26, r3Hour1: 20, r3Day2: 26, r3Hour2: 20 },
-    // Grupo I (8)
-    { r1Day1: 16, r1Hour1: 13, r1Day2: 16, r1Hour2: 19, r2Day1: 22, r2Hour1: 13, r2Day2: 22, r2Hour2: 19, r3Day1: 26, r3Hour1: 16, r3Day2: 26, r3Hour2: 16 },
-    // Grupo J (9)
-    { r1Day1: 16, r1Hour1: 16, r1Day2: 16, r1Hour2: 21, r2Day1: 22, r2Hour1: 16, r2Day2: 22, r2Hour2: 21, r3Day1: 27, r3Hour1: 20, r3Day2: 27, r3Hour2: 20 },
-    // Grupo K (10)
-    { r1Day1: 17, r1Hour1: 13, r1Day2: 17, r1Hour2: 19, r2Day1: 23, r2Hour1: 13, r2Day2: 23, r2Hour2: 19, r3Day1: 27, r3Hour1: 16, r3Day2: 27, r3Hour2: 16 },
-    // Grupo L (11)
-    { r1Day1: 17, r1Hour1: 16, r1Day2: 17, r1Hour2: 21, r2Day1: 23, r2Hour1: 16, r2Day2: 23, r2Hour2: 21, r3Day1: 27, r3Hour1: 20, r3Day2: 27, r3Hour2: 20 }
-  ];
-
-  const matches = [];
-  let matchId = 1;
-
-  const groupKeys = Object.keys(groupsData);
-
-  groupKeys.forEach((groupName, gIdx) => {
-    const teams = groupsData[groupName];
-    const sched = groupSchedule[gIdx];
-
-    // Rodada 1 de Grupos
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[0].name,
-      away_team: teams[1].name,
-      home_team_flag: getFlagUrl(teams[0].name),
-      away_team_flag: getFlagUrl(teams[1].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r1Day1, sched.r1Hour1)
-    });
-
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[2].name,
-      away_team: teams[3].name,
-      home_team_flag: getFlagUrl(teams[2].name),
-      away_team_flag: getFlagUrl(teams[3].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r1Day2, sched.r1Hour2)
-    });
-
-    // Rodada 2 de Grupos
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[0].name,
-      away_team: teams[2].name,
-      home_team_flag: getFlagUrl(teams[0].name),
-      away_team_flag: getFlagUrl(teams[2].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r2Day1, sched.r2Hour1, sched.hasMinutes ? 30 : 0)
-    });
-
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[1].name,
-      away_team: teams[3].name,
-      home_team_flag: getFlagUrl(teams[1].name),
-      away_team_flag: getFlagUrl(teams[3].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r2Day2, sched.r2Hour2)
-    });
-
-    // Rodada 3 de Grupos
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[3].name,
-      away_team: teams[0].name,
-      home_team_flag: getFlagUrl(teams[3].name),
-      away_team_flag: getFlagUrl(teams[0].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r3Day1, sched.r3Hour1)
-    });
-
-    matches.push({
-      id: matchId++,
-      round: 'Fase de Grupos',
-      group_name: groupName,
-      home_team: teams[1].name,
-      away_team: teams[2].name,
-      home_team_flag: getFlagUrl(teams[1].name),
-      away_team_flag: getFlagUrl(teams[2].name),
-      status: 'scheduled',
-      match_date: makeBrtDate(sched.r3Day2, sched.r3Hour2)
-    });
-  });
-
-  return matches;
+  return matchesData.map(m => ({
+    id: m.id,
+    round: 'Fase de Grupos',
+    group_name: m.group,
+    home_team: m.home,
+    away_team: m.away,
+    home_team_flag: getFlagUrl(m.home),
+    away_team_flag: getFlagUrl(m.away),
+    status: 'scheduled',
+    match_date: m.time
+  }));
 };
