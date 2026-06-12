@@ -207,6 +207,12 @@ export default function Admin({ profile, showToast }) {
         .eq('id', matchId);
 
       if (error) throw error;
+
+      // Se o jogo foi encerrado, salva snapshot do ranking para comparação
+      if (status === 'finished') {
+        await saveRankingSnapshot();
+      }
+
       showToast(`Jogo #${matchId} atualizado! ${status === 'finished' ? 'Pontuações recalculadas ✅' : ''}`, 'success');
 
       // Atualiza a lista local
@@ -232,6 +238,31 @@ export default function Admin({ profile, showToast }) {
     }
   };
 
+  // Salva snapshot do ranking atual no Supabase para exibir movimentação
+  // Chamado automaticamente após atualizar placar de jogo finalizado
+  const saveRankingSnapshot = async () => {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .order('total_points', { ascending: false })
+        .order('exact_scores_count', { ascending: false })
+        .order('pts7_count', { ascending: false });
+
+      if (error || !profiles) return;
+
+      const ranks = {};
+      profiles.forEach((p, i) => { ranks[p.id] = i + 1; });
+
+      await supabase.from('app_settings').upsert({
+        key: 'ranking_snapshot',
+        value: { savedAt: new Date().toISOString(), ranks }
+      }, { onConflict: 'key' });
+    } catch (err) {
+      console.warn('Erro ao salvar snapshot do ranking:', err);
+    }
+  };
+
   const recalculateAllPoints = async () => {
     const confirmed = window.confirm(
       '⚙️ Recalcular TODOS os pontos do bolão?\n\n' +
@@ -243,6 +274,8 @@ export default function Admin({ profile, showToast }) {
     try {
       const { data, error } = await supabase.rpc('admin_recalculate_all_points');
       if (error) throw error;
+      // Salva snapshot do ranking após recalcular pontos
+      await saveRankingSnapshot();
       showToast(data || 'Recálculo concluído com sucesso!', 'success');
     } catch (err) {
       console.error(err);

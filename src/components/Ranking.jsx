@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Trophy, Star, Activity, X, ChevronDown, Search } from 'lucide-react';
+import { Trophy, Star, Activity, X, ChevronDown } from 'lucide-react';
 
 const renderFlag = (flag) => {
   if (!flag) return <span>🏳️</span>;
@@ -184,7 +184,7 @@ const computeProfileAchievements = (profile) => {
 export default function Ranking({ currentUser, showToast }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Movimentação de posicões: { userId: { delta: number, isNew: bool } }
+  // Movimentação de posições: { userId: { delta: number, isNew: bool } }
   const [rankMovement, setRankMovement] = useState({});
   const [snapshotDate, setSnapshotDate] = useState(null);
 
@@ -192,14 +192,12 @@ export default function Ranking({ currentUser, showToast }) {
   const [detailUser, setDetailUser] = useState(null);
   const [detailGuesses, setDetailGuesses] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredLeaderboard = leaderboard.map((profile, index) => ({
+  // Ranking com posição numerada (sem filtro de busca)
+  const rankedLeaderboard = leaderboard.map((profile, index) => ({
     ...profile,
     rank: index + 1
-  })).filter(profile =>
-    profile.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  }));
 
   useEffect(() => {
     fetchLeaderboard();
@@ -220,18 +218,18 @@ export default function Ranking({ currentUser, showToast }) {
       const newData = data || [];
       setLeaderboard(newData);
 
-      // --- Cálculo de movimentação via localStorage ---
-      const SNAPSHOT_KEY = 'bolao_ranking_snapshot';
-      let movement = {};
-      let savedAt = null;
-
+      // --- Cálculo de movimentação via snapshot do Supabase (compartilhado entre todos) ---
       try {
-        const raw = localStorage.getItem(SNAPSHOT_KEY);
-        if (raw) {
-          const snapshot = JSON.parse(raw);
-          savedAt = snapshot.savedAt;
-          // Mapa antigo: { userId -> rank }
+        const { data: settingsData } = await supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'ranking_snapshot')
+          .maybeSingle();
+
+        if (settingsData?.value) {
+          const snapshot = settingsData.value;
           const oldRanks = snapshot.ranks || {};
+          const movement = {};
 
           newData.forEach((profile, index) => {
             const currentRank = index + 1;
@@ -242,22 +240,13 @@ export default function Ranking({ currentUser, showToast }) {
               movement[profile.id] = { delta: previousRank - currentRank, isNew: false };
             }
           });
-        }
-        // Salva novo snapshot
-        const newRanks = {};
-        newData.forEach((profile, index) => {
-          newRanks[profile.id] = index + 1;
-        });
-        localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({
-          savedAt: new Date().toISOString(),
-          ranks: newRanks,
-        }));
-      } catch (lsErr) {
-        console.warn('Erro ao ler/salvar snapshot do ranking:', lsErr);
-      }
 
-      setRankMovement(movement);
-      setSnapshotDate(savedAt);
+          setRankMovement(movement);
+          setSnapshotDate(snapshot.savedAt);
+        }
+      } catch (snapshotErr) {
+        console.warn('Erro ao buscar snapshot do ranking:', snapshotErr);
+      }
     } catch (err) {
       console.error('Erro ao carregar ranking:', err);
       showToast('Erro ao carregar tabela de líderes: ' + err.message, 'error');
@@ -342,21 +331,7 @@ export default function Ranking({ currentUser, showToast }) {
         </button>
       </div>
 
-      {/* Barra de Pesquisa */}
-      {!loading && leaderboard.length > 0 && (
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
-          <input
-            type="text"
-            className="form-input search-input"
-            placeholder="Buscar participante..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '38px', fontSize: '0.85rem', padding: '8px 12px' }}
-          />
-        </div>
-      )}
-
+      {/* Tabela */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
           Carregando ranking...
@@ -364,10 +339,6 @@ export default function Ranking({ currentUser, showToast }) {
       ) : leaderboard.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
           Nenhum participante cadastrado ainda.
-        </div>
-      ) : filteredLeaderboard.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-secondary)' }}>
-          Nenhum participante encontrado com "{searchQuery}".
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -382,7 +353,7 @@ export default function Ranking({ currentUser, showToast }) {
               </tr>
             </thead>
             <tbody>
-              {filteredLeaderboard.map((profile) => {
+              {rankedLeaderboard.map((profile) => {
                 const isSelf = currentUser && profile.id === currentUser.id;
                 const position = profile.rank;
                 let posClass = '';
