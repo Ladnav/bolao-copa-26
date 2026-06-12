@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Search, Save, Eye, Calendar, Clock, Lock, Pencil, CheckCircle2, BellOff, ChevronRight } from 'lucide-react';
 import { translateTeamName } from '../data/teamNameMap';
+import { getTeamStaticStats } from '../data/teamStats';
 
 const renderFlag = (flag) => {
   if (!flag) return <span className="team-flag">🏳️</span>;
@@ -980,10 +981,70 @@ export default function Dashboard({ user, profile, showToast }) {
           </div>
         ) : !teamPopover.data || teamPopover.data.length === 0 ? (
           <div className="thp-empty">Nenhum jogo encontrado para esta seleção.</div>
-        ) : (
-          <div className="thp-list">
-            <div className="thp-subtitle">Último jogo</div>
-            {teamPopover.data.map((ev, i) => {
+        ) : (() => {
+          // Calcula estatísticas em tempo real do torneio atual
+          let tMatches = 0, tWins = 0, tDraws = 0, tLosses = 0, tGoalsFor = 0, tGoalsAgainst = 0;
+          matches.forEach(m => {
+            if (m.status === 'finished') {
+              if (m.home_team === teamPopover.teamName) {
+                tMatches++;
+                tGoalsFor += m.home_score;
+                tGoalsAgainst += m.away_score;
+                if (m.home_score > m.away_score) tWins++;
+                else if (m.home_score === m.away_score) tDraws++;
+                else tLosses++;
+              } else if (m.away_team === teamPopover.teamName) {
+                tMatches++;
+                tGoalsFor += m.away_score;
+                tGoalsAgainst += m.home_score;
+                if (m.away_score > m.home_score) tWins++;
+                else if (m.away_score === m.home_score) tDraws++;
+                else tLosses++;
+              }
+            }
+          });
+          const tPoints = (tWins * 3) + (tDraws * 1);
+          const tGoalDiff = tGoalsFor - tGoalsAgainst;
+          const staticStats = getTeamStaticStats(teamPopover.teamName);
+
+          return (
+            <div className="thp-content">
+              {/* Box de Ranking/História */}
+              <div className="thp-stats-grid thp-static-stats">
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Ranking FIFA</span>
+                  <span className="thp-stat-val">{staticStats.fifaRanking !== '-' ? `#${staticStats.fifaRanking}` : '-'}</span>
+                </div>
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Títulos Mundiais</span>
+                  <span className="thp-stat-val">{staticStats.titles > 0 ? `🏆 ${staticStats.titles}` : '0'}</span>
+                </div>
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Confederação</span>
+                  <span className="thp-stat-val">{staticStats.confederation}</span>
+                </div>
+              </div>
+
+              {/* Box de Performance na Copa Atual */}
+              <div className="thp-stats-grid thp-live-stats">
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Pts na Copa</span>
+                  <span className="thp-stat-val">{tPoints}</span>
+                </div>
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Desempenho</span>
+                  <span className="thp-stat-val">{tWins}V {tDraws}E {tLosses}D</span>
+                </div>
+                <div className="thp-stat-box">
+                  <span className="thp-stat-label">Gols (SG)</span>
+                  <span className="thp-stat-val">{tGoalsFor}:{tGoalsAgainst} ({tGoalDiff > 0 ? `+${tGoalDiff}` : tGoalDiff})</span>
+                </div>
+              </div>
+
+              {/* Último jogo (API) */}
+              <div className="thp-list">
+                <div className="thp-subtitle">Último jogo (Geral)</div>
+                {teamPopover.data.map((ev, i) => {
               const isHome = ev.strHomeTeam?.toLowerCase() === translateTeamName(teamPopover.teamName).toLowerCase()
                 || ev.strHomeTeam?.toLowerCase() === teamPopover.teamName.toLowerCase();
               const myScore  = isHome ? parseInt(ev.intHomeScore) : parseInt(ev.intAwayScore);
@@ -1016,8 +1077,11 @@ export default function Dashboard({ user, profile, showToast }) {
                 </div>
               );
             })}
-            <div className="thp-footer">Fonte: TheSportsDB • Clique fora para fechar</div>
-          </div>
+                <div className="thp-footer">Fonte: TheSportsDB • Clique fora para fechar</div>
+              </div>
+            </div>
+          );
+        })()}
         )}
       </div>
     )}
