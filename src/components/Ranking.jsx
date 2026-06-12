@@ -181,6 +181,145 @@ const computeProfileAchievements = (profile) => {
   return PROFILE_ACHIEVEMENTS.filter(a => a.check(profile));
 };
 
+// ---------------------------------------------------------
+// Gráfico SVG de Evolução de Posição no Ranking
+// ---------------------------------------------------------
+const PositionHistoryChart = ({ userId, snapshots }) => {
+  const data = (snapshots || [])
+    .filter(s => s.ranks && s.ranks[userId] !== undefined)
+    .map(s => ({ date: new Date(s.savedAt), pos: s.ranks[userId] }));
+
+  if (data.length === 0) {
+    return (
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+        Nenhum histórico registrado ainda — aparecerá após a próxima atualização de placar.
+      </p>
+    );
+  }
+
+  if (data.length === 1) {
+    return (
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+        Apenas 1 registo — aguarde mais jogos para ver a evolução.
+      </p>
+    );
+  }
+
+  // Dimensões do gráfico
+  const W = 500, H = 130;
+  const PAD = { top: 22, right: 24, bottom: 28, left: 32 };
+  const iW = W - PAD.left - PAD.right;
+  const iH = H - PAD.top - PAD.bottom;
+
+  const positions = data.map(d => d.pos);
+  const minPos = Math.min(...positions);
+  const maxPos = Math.max(...positions);
+  const range = maxPos === minPos ? 1 : maxPos - minPos;
+
+  // Posição 1 (melhor) fica no TOPO — número menor = Y menor
+  const xOf = (i) => PAD.left + (i / (data.length - 1)) * iW;
+  const yOf = (pos) => PAD.top + ((pos - minPos) / range) * iH;
+
+  const pts = data.map((d, i) => ({ x: xOf(i), y: yOf(d.pos), ...d }));
+
+  // Curva bezier suave
+  const pathD = pts.reduce((acc, p, i) => {
+    if (i === 0) return `M${p.x},${p.y}`;
+    const prev = pts[i - 1];
+    const cx1 = prev.x + (p.x - prev.x) * 0.5;
+    const cx2 = p.x - (p.x - prev.x) * 0.5;
+    return `${acc} C${cx1},${prev.y} ${cx2},${p.y} ${p.x},${p.y}`;
+  }, '');
+
+  // Área preenchida sob a curva
+  const areaD = `${pathD} L${pts[pts.length-1].x},${PAD.top + iH} L${pts[0].x},${PAD.top + iH} Z`;
+
+  // Linhas de grade horizontais (3 linhas)
+  const gridLines = [0, 0.5, 1].map(t => PAD.top + t * iH);
+
+  const fmtDate = (d) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const fmtTime = (d) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
+      role="img"
+      aria-label="Gráfico de evolução de posição no ranking"
+    >
+      <defs>
+        <linearGradient id={`chartGrad-${userId}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.03" />
+        </linearGradient>
+        <filter id="dot-glow">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+
+      {/* Linhas de grade */}
+      {gridLines.map((y, i) => (
+        <line key={i} x1={PAD.left} y1={y} x2={PAD.left + iW} y2={y}
+          stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+      ))}
+
+      {/* Área preenchida */}
+      <path d={areaD} fill={`url(#chartGrad-${userId})`} />
+
+      {/* Linha da curva */}
+      <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2.5"
+        strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Pontos e labels */}
+      {pts.map((p, i) => {
+        const isFirst = i === 0;
+        const isLast = i === pts.length - 1;
+        const isBest = p.pos === minPos;
+        const dotColor = isBest ? '#4ade80' : '#3b82f6';
+        return (
+          <g key={i}>
+            {/* Halo no ponto */}
+            {isBest && (
+              <circle cx={p.x} cy={p.y} r={9} fill="rgba(74,222,128,0.15)" />
+            )}
+            {/* Ponto */}
+            <circle cx={p.x} cy={p.y} r={isBest ? 5.5 : 4}
+              fill={dotColor} filter="url(#dot-glow)" />
+            {/* Label de posição acima do ponto */}
+            <text
+              x={p.x}
+              y={p.y - 10}
+              textAnchor="middle"
+              fontSize="10"
+              fontWeight="700"
+              fill={isBest ? '#4ade80' : 'rgba(255,255,255,0.75)'}
+            >
+              {p.pos}º
+            </text>
+            {/* Data no eixo X — apenas primeiro, último e pontos espaçados */}
+            {(isFirst || isLast || data.length <= 6 || i % Math.ceil(data.length / 5) === 0) && (
+              <text
+                x={p.x}
+                y={H - 2}
+                textAnchor={isFirst ? 'start' : isLast ? 'end' : 'middle'}
+                fontSize="8.5"
+                fill="rgba(255,255,255,0.35)"
+              >
+                {fmtDate(p.date)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {/* Linha vertical do eixo Y */}
+      <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + iH}
+        stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+    </svg>
+  );
+};
+
 export default function Ranking({ currentUser, showToast }) {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -192,6 +331,8 @@ export default function Ranking({ currentUser, showToast }) {
   const [detailUser, setDetailUser] = useState(null);
   const [detailGuesses, setDetailGuesses] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  // Histórico de posições para o gráfico
+  const [rankHistory, setRankHistory] = useState([]);
 
   // Ranking com posição numerada (sem filtro de busca)
   const rankedLeaderboard = leaderboard.map((profile, index) => ({
@@ -259,35 +400,45 @@ export default function Ranking({ currentUser, showToast }) {
     setDetailUser(profile);
     setLoadingDetail(true);
     setDetailGuesses([]);
+    setRankHistory([]);
     try {
-      const { data, error } = await supabase
-        .from('guesses')
-        .select(`
-          id,
-          home_guess,
-          away_guess,
-          points_awarded,
-          is_super,
-          match_id,
-          matches (
+      // Busca palpites e histórico em paralelo
+      const [guessesResult, historyResult] = await Promise.all([
+        supabase
+          .from('guesses')
+          .select(`
             id,
-            home_team,
-            away_team,
-            home_team_flag,
-            away_team_flag,
-            home_score,
-            away_score,
-            status,
-            round,
-            group_name,
-            match_date
-          )
-        `)
-        .eq('user_id', profile.id)
-        .order('points_awarded', { ascending: false, nullsFirst: false });
+            home_guess,
+            away_guess,
+            points_awarded,
+            is_super,
+            match_id,
+            matches (
+              id,
+              home_team,
+              away_team,
+              home_team_flag,
+              away_team_flag,
+              home_score,
+              away_score,
+              status,
+              round,
+              group_name,
+              match_date
+            )
+          `)
+          .eq('user_id', profile.id)
+          .order('points_awarded', { ascending: false, nullsFirst: false }),
+        supabase
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'ranking_history')
+          .maybeSingle()
+      ]);
 
-      if (error) throw error;
-      setDetailGuesses(data || []);
+      if (guessesResult.error) throw guessesResult.error;
+      setDetailGuesses(guessesResult.data || []);
+      setRankHistory(historyResult.data?.value?.snapshots || []);
     } catch (err) {
       console.error(err);
       showToast('Erro ao carregar detalhes: ' + err.message, 'error');
@@ -515,6 +666,31 @@ export default function Ranking({ currentUser, showToast }) {
               const earned = computeAchievements(detailUser, detailGuesses);
               return (
                 <>
+                  {/* Seção de Gráfico — Evolução de Posição */}
+                  <div className="achievements-section" style={{ marginBottom: '16px' }}>
+                    <div className="achievements-header">
+                      <span>📈</span>
+                      <span>Evolução no Ranking</span>
+                      {rankHistory.length >= 2 && (
+                        <span className="achievements-count">{rankHistory.filter(s => s.ranks?.[detailUser.id]).length} pontos</span>
+                      )}
+                    </div>
+                    <PositionHistoryChart userId={detailUser.id} snapshots={rankHistory} />
+                    {rankHistory.filter(s => s.ranks?.[detailUser.id]).length >= 2 && (
+                      <div style={{ display: 'flex', gap: '14px', marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }}></span>
+                          Melhor posição
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }}></span>
+                          Demais registros
+                        </span>
+                        <span style={{ marginLeft: 'auto', fontStyle: 'italic' }}>Atualiza a cada placar salvo</span>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Seção de Conquistas */}
                   <div className="achievements-section">
                     <div className="achievements-header">

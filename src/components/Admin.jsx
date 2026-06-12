@@ -238,7 +238,7 @@ export default function Admin({ profile, showToast }) {
     }
   };
 
-  // Salva snapshot do ranking atual no Supabase para exibir movimentação
+  // Salva snapshot do ranking atual no Supabase para exibir movimentação e histórico
   // Chamado automaticamente após atualizar placar de jogo finalizado
   const saveRankingSnapshot = async () => {
     try {
@@ -253,11 +253,29 @@ export default function Admin({ profile, showToast }) {
 
       const ranks = {};
       profiles.forEach((p, i) => { ranks[p.id] = i + 1; });
+      const entry = { savedAt: new Date().toISOString(), ranks };
 
-      await supabase.from('app_settings').upsert({
-        key: 'ranking_snapshot',
-        value: { savedAt: new Date().toISOString(), ranks }
-      }, { onConflict: 'key' });
+      // Busca histórico existente para acrescentar nova entrada
+      const { data: histData } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'ranking_history')
+        .maybeSingle();
+
+      const existing = histData?.value?.snapshots || [];
+      const updatedSnapshots = [...existing, entry].slice(-30); // máximo 30 entradas
+
+      // Salva snapshot atual + histórico em paralelo
+      await Promise.all([
+        supabase.from('app_settings').upsert({
+          key: 'ranking_snapshot',
+          value: entry
+        }, { onConflict: 'key' }),
+        supabase.from('app_settings').upsert({
+          key: 'ranking_history',
+          value: { snapshots: updatedSnapshots }
+        }, { onConflict: 'key' }),
+      ]);
     } catch (err) {
       console.warn('Erro ao salvar snapshot do ranking:', err);
     }
