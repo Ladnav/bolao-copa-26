@@ -331,7 +331,21 @@ export default function Dashboard({ user, profile, showToast }) {
           })
           .map(([mIdStr]) => parseInt(mIdStr));
 
-        // Desativar cada super palpite conflitante no banco
+        // BLOQUEIO: se algum super conflitante está em jogo JÁ ENCERRADO, não é possível substituir
+        const lockedSuperMatch = otherSuperMatchIds
+          .map(id => matches.find(m => m.id === id))
+          .find(m => m && isGuessClosed(m));
+
+        if (lockedSuperMatch) {
+          showToast(
+            `❌ Super Palpite já usado em "${lockedSuperMatch.home_team} x ${lockedSuperMatch.away_team}" (prazo encerrado). Não é possível substituir.`,
+            'error'
+          );
+          setSavingId(null);
+          return;
+        }
+
+        // Desativar cada super palpite conflitante no banco (todos são de jogos ainda abertos)
         for (const otherMatchId of otherSuperMatchIds) {
           const otherGuess = userGuesses[otherMatchId];
           if (!otherGuess) continue;
@@ -500,6 +514,18 @@ export default function Dashboard({ user, profile, showToast }) {
     const guessClosed = isGuessClosed(match);
     const guess = userGuesses[match.id] || { home_guess: '', away_guess: '', points_awarded: null };
 
+    // Verifica se o super palpite desta rodada já foi consumido em outro jogo encerrado
+    const roundBucket = user ? getMatchRoundBucket(match) : null;
+    const superLockedInRound = user && !guessClosed && !guess.is_super && roundBucket
+      ? Object.entries(userGuesses).some(([mIdStr, g]) => {
+          const mId = parseInt(mIdStr);
+          if (mId === match.id) return false;
+          if (!g?.is_super) return false;
+          const m = matches.find(item => item.id === mId);
+          return m && getMatchRoundBucket(m) === roundBucket && isGuessClosed(m);
+        })
+      : false;
+
     return (
       <div
         key={match.id}
@@ -516,12 +542,14 @@ export default function Dashboard({ user, profile, showToast }) {
             )}
             {user && !guessClosed && (
               <button
-                className={`btn-star ${guess.is_super ? 'active' : ''}`}
+                className={`btn-star ${guess.is_super ? 'active' : ''} ${superLockedInRound ? 'locked' : ''}`}
                 onClick={() => toggleSuperGuess(match.id)}
-                disabled={savingId === match.id}
-                title={guess.is_super ? "Remover Super Palpite" : "Marcar como Super Palpite (Dobro de Pontos!)"}
+                disabled={savingId === match.id || superLockedInRound}
+                title={superLockedInRound
+                  ? '❌ Super Palpite já usado em jogo encerrado desta rodada'
+                  : guess.is_super ? 'Remover Super Palpite' : 'Marcar como Super Palpite (Dobro de Pontos!)'}
               >
-                ⭐
+                {superLockedInRound ? '🔒' : '⭐'}
               </button>
             )}
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem' }}>
