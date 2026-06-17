@@ -146,27 +146,26 @@ BEGIN
     RETURN 5;
   END IF;
 
-  -- 3. Empate real mas palpitou vencedor (ou vice-versa): mínimo 1 ponto
-  --    Empates são difíceis de prever — ninguém fica zerado
+  -- Errou o empate completamente (palpitou vencedor mas foi empate, ou vice-versa): 0 pontos
   IF actual_winner = 0 OR guess_winner = 0 THEN
-    RETURN 1;
+    RETURN 0;
   END IF;
 
   -- Acertou quem venceu
   IF guess_winner = actual_winner THEN
-    -- 4. Vencedor + Saldo de Gols (7 pontos)
+    -- 3. Vencedor + Saldo de Gols (7 pontos)
     IF guess_diff = actual_diff THEN
       RETURN 7;
     END IF;
-    -- 5. Vencedor + Gols de um Time (5 pontos)
+    -- 4. Vencedor + Gols de um Time (5 pontos)
     IF h_guess = h_score OR a_guess = a_score THEN
       RETURN 5;
     END IF;
-    -- 6. Vencedor Apenas (3 pontos)
+    -- 5. Vencedor Apenas (3 pontos)
     RETURN 3;
   END IF;
 
-  -- 7. Erro total (0 pontos)
+  -- 6. Erro total (0 pontos)
   RETURN 0;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;

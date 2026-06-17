@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Trophy, Star, Activity, X, ChevronDown } from 'lucide-react';
 
@@ -334,6 +334,10 @@ export default function Ranking({ currentUser, showToast }) {
   // Movimentação de posições: { userId: { delta: number, isNew: bool } }
   const [rankMovement, setRankMovement] = useState({});
   const [snapshotDate, setSnapshotDate] = useState(null);
+  // Jogo que gerou a última movimentação do ranking
+  const [snapshotMatch, setSnapshotMatch] = useState(null);
+  // Ref para debounce do refresh automático
+  const refreshDebounceRef = useRef(null);
 
   // Modal de detalhes
   const [detailUser, setDetailUser] = useState(null);
@@ -350,6 +354,29 @@ export default function Ranking({ currentUser, showToast }) {
 
   useEffect(() => {
     fetchLeaderboard();
+
+    // Subscription Realtime: quando o admin encerrar um jogo e o snapshot for
+    // atualizado em app_settings, recarregar o ranking automaticamente.
+    // Debounce de 3s para evitar flicker e múltiplas requisições rápidas.
+    const channel = supabase
+      .channel('ranking-snapshot-watch')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_settings', filter: 'key=eq.ranking_snapshot' },
+        () => {
+          // Cancela refresh anterior se ainda não disparou
+          if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+          refreshDebounceRef.current = setTimeout(() => {
+            fetchLeaderboard();
+          }, 3000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (refreshDebounceRef.current) clearTimeout(refreshDebounceRef.current);
+    };
   }, []);
 
   const fetchLeaderboard = async () => {
@@ -392,6 +419,19 @@ export default function Ranking({ currentUser, showToast }) {
 
           setRankMovement(movement);
           setSnapshotDate(snapshot.savedAt);
+          // Guarda info do jogo que gerou esta movimentação (se existir)
+          if (snapshot.homeTeam && snapshot.awayTeam) {
+            setSnapshotMatch({
+              homeTeam: snapshot.homeTeam,
+              awayTeam: snapshot.awayTeam,
+              homeScore: snapshot.homeScore,
+              awayScore: snapshot.awayScore,
+              homeFlag: snapshot.homeFlag,
+              awayFlag: snapshot.awayFlag,
+            });
+          } else {
+            setSnapshotMatch(null);
+          }
         }
       } catch (snapshotErr) {
         console.warn('Erro ao buscar snapshot do ranking:', snapshotErr);
@@ -538,12 +578,12 @@ export default function Ranking({ currentUser, showToast }) {
                             <span className="rank-movement rank-new" data-tooltip="Primeira vez no ranking!">NOVO</span>
                           );
                           if (mv.delta > 0) return (
-                            <span className="rank-movement rank-up" data-tooltip={`Subiu ${mv.delta} posição${mv.delta > 1 ? 'ões' : ''} desde a última atualização`}>
+                            <span className="rank-movement rank-up" data-tooltip={`Subiu ${mv.delta} posição${mv.delta > 1 ? 'ões' : ''} em relação à partida anterior`}>
                               ▲ {mv.delta}
                             </span>
                           );
                           if (mv.delta < 0) return (
-                            <span className="rank-movement rank-down" data-tooltip={`Caiu ${Math.abs(mv.delta)} posição${Math.abs(mv.delta) > 1 ? 'ões' : ''} desde a última atualização`}>
+                            <span className="rank-movement rank-down" data-tooltip={`Caiu ${Math.abs(mv.delta)} posição${Math.abs(mv.delta) > 1 ? 'ões' : ''} em relação à partida anterior`}>
                               ▼ {Math.abs(mv.delta)}
                             </span>
                           );
@@ -625,10 +665,34 @@ export default function Ranking({ currentUser, showToast }) {
         </div>
         {snapshotDate && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            <span>📊 Comparação com: </span>
-            <strong style={{ color: 'var(--text-secondary)' }}>
-              {new Date(snapshotDate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-            </strong>
+            <span>📊</span>
+            {snapshotMatch ? (
+              <span>
+                Variação após{' '}
+                <strong style={{ color: 'var(--text-secondary)' }}>
+                  {snapshotMatch.homeFlag && (
+                    snapshotMatch.homeFlag.startsWith('http')
+                      ? <img src={snapshotMatch.homeFlag} alt="" style={{ width: '16px', height: '11px', objectFit: 'cover', borderRadius: '2px', margin: '0 2px', verticalAlign: 'middle' }} />
+                      : <span style={{ marginRight: '2px' }}>{snapshotMatch.homeFlag}</span>
+                  )}
+                  {snapshotMatch.homeTeam}
+                  {' '}{snapshotMatch.homeScore} × {snapshotMatch.awayScore}{' '}
+                  {snapshotMatch.awayFlag && (
+                    snapshotMatch.awayFlag.startsWith('http')
+                      ? <img src={snapshotMatch.awayFlag} alt="" style={{ width: '16px', height: '11px', objectFit: 'cover', borderRadius: '2px', margin: '0 2px', verticalAlign: 'middle' }} />
+                      : <span style={{ marginRight: '2px' }}>{snapshotMatch.awayFlag}</span>
+                  )}
+                  {snapshotMatch.awayTeam}
+                </strong>
+              </span>
+            ) : (
+              <span>
+                Comparação com:{' '}
+                <strong style={{ color: 'var(--text-secondary)' }}>
+                  {new Date(snapshotDate).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </strong>
+              </span>
+            )}
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 14px', fontSize: '0.75rem', flexWrap: 'wrap' }}>

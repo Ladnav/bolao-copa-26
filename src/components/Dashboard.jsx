@@ -22,6 +22,8 @@ export default function Dashboard({ user, profile, showToast }) {
   const [savingId, setSavingId] = useState(null);
   // Filtro de palpites pendentes (jogos sem palpite ainda)
   const [showPendingOnly, setShowPendingOnly] = useState(false);
+  // Ocultar jogos já encerrados
+  const [hideFinished, setHideFinished] = useState(true);
   // Conjunto de matchIds atualmente em modo de edição (mesmo que já tenham palpite salvo)
   const [editingMatches, setEditingMatches] = useState(new Set());
 
@@ -238,13 +240,26 @@ export default function Dashboard({ user, profile, showToast }) {
           isSaved: true
         }
       }));
-      showToast('Palpite salvo! ✅', 'success');
+      const wasSuper = userGuesses[matchId]?.is_super;
+      showToast(wasSuper ? 'Palpite atualizado! ✅ Super Palpite ⭐ mantido.' : 'Palpite salvo! ✅', 'success');
     } catch (err) {
       console.error('Erro ao salvar palpite:', err);
       showToast('Erro: ' + (err.message || 'Sem permissão'), 'error');
     } finally {
       setSavingId(null);
     }
+  };
+
+  // Retorna o "bucket" de rodada de uma partida (usado para garantir 1 super palpite por rodada)
+  const getMatchRoundBucket = (m) => {
+    if (m.round === 'Fase de Grupos') {
+      const idx = ((m.id - 1) % 6) + 1;
+      if (idx <= 2) return 'Grupos-R1';
+      if (idx <= 4) return 'Grupos-R2';
+      return 'Grupos-R3';
+    }
+    if (m.round === 'Disputa de 3º lugar' || m.round === 'Final') return 'Fase-Final';
+    return m.round; // Rodada de 32, Quartas, Semis, etc.
   };
 
   const toggleSuperGuess = async (matchId) => {
@@ -268,13 +283,13 @@ export default function Dashboard({ user, profile, showToast }) {
     }
 
     const newSuperState = !guess.is_super;
-    
+
     if (newSuperState) {
       const groupMatchIdx = ((matchId - 1) % 6) + 1;
       const stageName = match.round === 'Fase de Grupos'
         ? (groupMatchIdx <= 2 ? 'Rodada 1 dos Grupos' : groupMatchIdx <= 4 ? 'Rodada 2 dos Grupos' : 'Rodada 3 dos Grupos')
         : (match.round === 'Disputa de 3º lugar' || match.round === 'Final' ? 'Fase Final' : match.round);
-      
+
       const confirmed = window.confirm(
         `⭐ ATIVAÇÃO DE SUPER PALPITE ⭐\n\n` +
         `Deseja definir a partida [${match.home_team} x ${match.away_team}] como seu Super Palpite da ${stageName}?\n\n` +
@@ -288,6 +303,45 @@ export default function Dashboard({ user, profile, showToast }) {
 
     setSavingId(matchId);
     try {
+      // Se estamos ATIVANDO um novo super palpite, primeiro desativamos todos os outros
+      // da mesma rodada (bucket) para garantir no máximo 1 super palpite por rodada.
+      if (newSuperState) {
+        const targetBucket = getMatchRoundBucket(match);
+
+        // Identificar todos os matchIds da mesma rodada que já têm is_super=true no estado local
+        const otherSuperMatchIds = Object.entries(userGuesses)
+          .filter(([mIdStr, g]) => {
+            const mId = parseInt(mIdStr);
+            if (mId === matchId) return false; // Ignora o atual
+            if (!g?.is_super) return false;    // Só considera os que são super
+            const m = matches.find(item => item.id === mId);
+            return m && getMatchRoundBucket(m) === targetBucket;
+          })
+          .map(([mIdStr]) => parseInt(mIdStr));
+
+        // Desativar cada super palpite conflitante no banco
+        for (const otherMatchId of otherSuperMatchIds) {
+          const otherGuess = userGuesses[otherMatchId];
+          if (!otherGuess) continue;
+          const { error: deactivateError } = await supabase
+            .from('guesses')
+            .upsert({
+              user_id: user.id,
+              match_id: otherMatchId,
+              home_guess: parseInt(otherGuess.home_guess),
+              away_guess: parseInt(otherGuess.away_guess),
+              is_super: false,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'user_id,match_id'
+            });
+          if (deactivateError) {
+            console.warn(`Aviso: não foi possível desativar super palpite do jogo ${otherMatchId}:`, deactivateError);
+          }
+        }
+      }
+
+      // Agora salva o estado do palpite atual
       const { data, error } = await supabase
         .from('guesses')
         .upsert({
@@ -313,7 +367,7 @@ export default function Dashboard({ user, profile, showToast }) {
         throw new Error('Erro ao salvar o Super Palpite. O prazo limite pode ter expirado.');
       }
 
-      // Recarrega todos os palpites para sincronizar e tirar estrelas anteriores
+      // Recarrega todos os palpites para sincronizar o estado local com o banco
       await fetchMatchesAndGuesses();
       showToast(newSuperState ? 'Super Palpite ativado! ⭐' : 'Super Palpite removido! 🌟', 'success');
     } catch (err) {
@@ -422,10 +476,13 @@ export default function Dashboard({ user, profile, showToast }) {
   const isPending = (match) => !isGuessClosed(match) && !userGuesses[match.id]?.isSaved;
   const pendingCount = filteredMatches.filter(isPending).length;
 
-  // Aplica filtro de pendentes se ativo
-  const displayedMatches = showPendingOnly
-    ? filteredMatches.filter(isPending)
-    : filteredMatches;
+  // Conta jogos já encerrados (prazo fechado) — para exibir no toggle
+  const finishedCount = filteredMatches.filter(m => isGuessClosed(m)).length;
+
+  // Aplica filtros: pendentes e/ou ocultar encerrados (prazo fechado)
+  const displayedMatches = filteredMatches
+    .filter(m => !showPendingOnly || isPending(m))
+    .filter(m => !hideFinished || !isGuessClosed(m));
 
   const renderMatchCard = (match) => {
     const guessClosed = isGuessClosed(match);
@@ -514,6 +571,9 @@ export default function Dashboard({ user, profile, showToast }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <CheckCircle2 size={16} color="var(--accent-green)" />
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Seu palpite:</span>
+                    {guess.is_super && (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--accent-gold)', fontWeight: '700', letterSpacing: '0.02em' }}>⭐ Super</span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span className="saved-guess-score">
@@ -522,12 +582,17 @@ export default function Dashboard({ user, profile, showToast }) {
                     <button
                       className="edit-guess-btn"
                       onClick={() => startEditing(match.id)}
-                      title="Editar palpite"
+                      title={guess.is_super ? 'Editar placar (Super Palpite será mantido!)' : 'Editar palpite'}
                     >
                       <Pencil size={13} />
                       Editar
                     </button>
                   </div>
+                  {guess.is_super && (
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                      ℹ️ Você pode editar o placar sem perder o Super Palpite.
+                    </div>
+                  )}
                 </div>
               ) : (
                 // Inputs de palpite (novo ou editando)
@@ -609,26 +674,23 @@ export default function Dashboard({ user, profile, showToast }) {
                       +{guess.points_awarded} pts {guess.is_super ? '⭐' : ''}
                     </span>
                     <span style={{ fontSize: '0.65rem', color: guess.is_super ? 'rgba(0,0,0,0.8)' : 'var(--text-muted)', fontWeight: guess.is_super ? '700' : 'normal' }}>
-                      {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
+                       {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
                        guess.points_awarded === 14 || guess.points_awarded === 7 ? '🎯 Saldo' :
                        guess.points_awarded === 10 || guess.points_awarded === 5 ? '✅ Venc+Gols' :
-                       guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : 
-                       guess.points_awarded === 2 || guess.points_awarded === 1 ? '🤝 Empate' : '❌ Zerou'}
+                       guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : '❌ Zerou'}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Botão para ver palpites da galera - apenas após o jogo começar */}
-              {new Date(match.match_date) <= new Date() && (
-                <button
-                  className="nav-button"
-                  onClick={() => openGuessesModal(match)}
-                  style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--card-border)', fontSize: '0.85rem', padding: '6px' }}
-                >
-                  <Eye size={14} /> Ver Palpites da Galera
-                </button>
-              )}
+              {/* Botão para ver palpites da galera - aparece assim que o palpite fechar (2h antes) */}
+              <button
+                className="nav-button"
+                onClick={() => openGuessesModal(match)}
+                style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--card-border)', fontSize: '0.85rem', padding: '6px' }}
+              >
+                <Eye size={14} /> Ver Palpites da Galera
+              </button>
             </div>
           )}
         </div>
@@ -641,7 +703,8 @@ export default function Dashboard({ user, profile, showToast }) {
       <div>
       {/* Barra de Filtros */}
       <div className="filter-bar glass-panel" style={{ padding: '15px 20px', borderRadius: 'var(--radius-sm)' }}>
-        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', flex: 1 }}>
+        {/* Linha 1: selects + busca */}
+        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
           <select
             className="select-filter"
             value={roundFilter}
@@ -649,6 +712,7 @@ export default function Dashboard({ user, profile, showToast }) {
               setRoundFilter(e.target.value);
               setGroupFilter('all');
               setShowPendingOnly(false); // Reseta filtro pendentes ao mudar fase
+              setHideFinished(true);     // Reseta ocultar encerrados ao mudar fase
             }}
           >
             <option value="Fase de Grupos">Fase de Grupos</option>
@@ -684,8 +748,11 @@ export default function Dashboard({ user, profile, showToast }) {
               style={{ paddingLeft: '38px' }}
             />
           </div>
+        </div>
 
-          {/* Botão de filtro: apenas jogos sem palpite */}
+        {/* Linha 2: botões de filtro rápido */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {/* Botão: apenas jogos sem palpite */}
           {user && (
             <button
               className={`pending-filter-btn ${showPendingOnly ? 'active' : ''} ${pendingCount > 0 && !showPendingOnly ? 'has-pending' : ''}`}
@@ -703,6 +770,21 @@ export default function Dashboard({ user, profile, showToast }) {
               )}
             </button>
           )}
+
+          {/* Botão: ocultar / mostrar jogos com prazo fechado */}
+          <button
+            className={`pending-filter-btn ${hideFinished ? 'active' : ''}`}
+            onClick={() => setHideFinished(prev => !prev)}
+            title={hideFinished
+              ? `Mostrar ${finishedCount} jogo(s) com prazo fechado`
+              : 'Ocultar jogos com prazo fechado'}
+          >
+            <span style={{ fontSize: '0.9rem' }}>{hideFinished ? '👁' : '🙈'}</span>
+            {hideFinished
+              ? <>{finishedCount > 0 ? `${finishedCount} oculto${finishedCount !== 1 ? 's' : ''}` : 'Mostrar todos'}</>
+              : 'Ocultar encerrados'
+            }
+          </button>
         </div>
       </div>
 

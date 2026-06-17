@@ -178,6 +178,7 @@ export default function Admin({ profile, showToast }) {
     }
 
     setSavingId(matchId);
+    const isBecomingFinished = status === 'finished' && match.status !== 'finished';
     try {
       // Processar deadline: converter de datetime-local para ISO string ou null
       let deadlineValue = null;
@@ -189,6 +190,13 @@ export default function Admin({ profile, showToast }) {
       let matchDateValue = match.match_date;
       if (edit.match_date) {
         matchDateValue = new Date(edit.match_date).toISOString();
+      }
+
+      // Captura posições ANTES do recálculo para usar como referência do delta
+      // (se o jogo está sendo finalizado agora)
+      let preRanksForSnapshot = null;
+      if (isBecomingFinished) {
+        preRanksForSnapshot = await captureCurrentRanks();
       }
 
       const { error } = await supabase
@@ -208,11 +216,6 @@ export default function Admin({ profile, showToast }) {
 
       if (error) throw error;
 
-      // Se o jogo foi encerrado, salva snapshot do ranking para comparação
-      if (status === 'finished') {
-        await saveRankingSnapshot();
-      }
-
       showToast(`Jogo #${matchId} atualizado! ${status === 'finished' ? 'Pontuações recalculadas ✅' : ''}`, 'success');
 
       // Atualiza a lista local
@@ -230,6 +233,23 @@ export default function Admin({ profile, showToast }) {
           match_date: matchDateValue
         } : m)
       );
+
+      // Salva snapshot após o trigger recalcular os pontos (~5s).
+      // O snapshot guarda as posições PRÉ-jogo (capturadas acima) como referência.
+      // Assim o Ranking mostra o delta causado POR ESTE jogo específico.
+      if (isBecomingFinished && preRanksForSnapshot) {
+        setTimeout(async () => {
+          await saveRankingSnapshot(preRanksForSnapshot, {
+            matchId,
+            homeTeam: edit.home_team || match.home_team,
+            awayTeam: edit.away_team || match.away_team,
+            homeScore: hScore,
+            awayScore: aScore,
+            homeFlag: edit.home_team_flag || match.home_team_flag,
+            awayFlag: edit.away_team_flag || match.away_team_flag,
+          });
+        }, 5000);
+      }
     } catch (err) {
       console.error(err);
       showToast('Erro ao atualizar jogo: ' + err.message, 'error');
@@ -238,9 +258,9 @@ export default function Admin({ profile, showToast }) {
     }
   };
 
-  // Salva snapshot do ranking atual no Supabase para exibir movimentação e histórico
-  // Chamado automaticamente após atualizar placar de jogo finalizado
-  const saveRankingSnapshot = async () => {
+  // Captura as posições atuais do ranking como objeto { [userId]: rank }.
+  // Chamado ANTES do update do jogo para registrar o estado pré-jogo como referência do delta.
+  const captureCurrentRanks = async () => {
     try {
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -248,12 +268,37 @@ export default function Admin({ profile, showToast }) {
         .order('total_points', { ascending: false })
         .order('exact_scores_count', { ascending: false })
         .order('pts7_count', { ascending: false });
-
-      if (error || !profiles) return;
-
+      if (error || !profiles) return null;
       const ranks = {};
       profiles.forEach((p, i) => { ranks[p.id] = i + 1; });
-      const entry = { savedAt: new Date().toISOString(), ranks };
+      return ranks;
+    } catch {
+      return null;
+    }
+  };
+
+  // Salva snapshot do ranking no Supabase com as posições PRÉ-jogo (antes do recálculo).
+  // O Ranking usa este snapshot para mostrar o delta causado pelo jogo que acabou de ser encerrado:
+  // delta = posição no snapshot (antes) - posição atual (depois do recálculo).
+  // matchInfo: { matchId, homeTeam, awayTeam, homeScore, awayScore, homeFlag, awayFlag }
+  const saveRankingSnapshot = async (preRanks, matchInfo = null) => {
+    try {
+      if (!preRanks) return;
+
+      const entry = {
+        savedAt: new Date().toISOString(),
+        ranks: preRanks,
+        // Info do jogo que gerou esta movimentação (para exibir no Ranking)
+        ...(matchInfo ? {
+          matchId: matchInfo.matchId,
+          homeTeam: matchInfo.homeTeam,
+          awayTeam: matchInfo.awayTeam,
+          homeScore: matchInfo.homeScore,
+          awayScore: matchInfo.awayScore,
+          homeFlag: matchInfo.homeFlag,
+          awayFlag: matchInfo.awayFlag,
+        } : {}),
+      };
 
       // Busca histórico existente para acrescentar nova entrada
       const { data: histData } = await supabase
@@ -290,16 +335,43 @@ export default function Admin({ profile, showToast }) {
 
     setRecalcLoading(true);
     try {
+      // Captura posições ANTES do recálculo, depois salva snapshot para exibir o delta
+      const preRanks = await captureCurrentRanks();
+
       const { data, error } = await supabase.rpc('admin_recalculate_all_points');
       if (error) throw error;
-      // Salva snapshot do ranking após recalcular pontos
-      await saveRankingSnapshot();
+
+      // Aguarda um momento para garantir que o recálculo propagou, então salva snapshot
+      setTimeout(async () => {
+        await saveRankingSnapshot(preRanks);
+      }, 2000);
+
       showToast(data || 'Recálculo concluído com sucesso!', 'success');
     } catch (err) {
       console.error(err);
       showToast('Erro ao recalcular: ' + err.message, 'error');
     } finally {
       setRecalcLoading(false);
+    }
+  };
+
+  // Reseta o snapshot do ranking para as posições ATUAIS.
+  // Use quando o snapshot salvo está desatualizado (ex: posições pós-jogo em vez de pré-jogo).
+  // Após o reset, o próximo jogo finalizado vai gerar um delta correto.
+  const resetSnapshot = async () => {
+    const confirmed = window.confirm(
+      '🔄 Resetar snapshot do ranking?\n\n' +
+      'Isso vai salvar as posições ATUAIS como referência. O delta de posição no Ranking será zerado e calculado corretamente a partir do próximo jogo finalizado.'
+    );
+    if (!confirmed) return;
+    try {
+      const currentRanks = await captureCurrentRanks();
+      if (!currentRanks) throw new Error('Não foi possível capturar as posições atuais.');
+      await saveRankingSnapshot(currentRanks);
+      showToast('Snapshot resetado! O delta será calculado corretamente no próximo jogo.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao resetar snapshot: ' + err.message, 'error');
     }
   };
 
@@ -346,6 +418,13 @@ export default function Admin({ profile, showToast }) {
           >
             <RefreshCw size={14} style={{ marginRight: '5px' }} />
             {recalcLoading ? 'Recalculando...' : 'Recalcular Pontos'}
+          </button>
+          <button
+            className="btn-primary"
+            style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', boxShadow: '0 4px 15px rgba(14,165,233,0.3)' }}
+            onClick={resetSnapshot}
+          >
+            🔄 Resetar Snapshot
           </button>
         </div>
       </div>
