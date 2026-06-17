@@ -85,15 +85,28 @@ export default function Dashboard({ user, profile, showToast }) {
     setTeamPopover({ teamName, x, y, loading: false });
   }, [teamPopover]);
 
+  // Retorna o índice da rodada dentro do grupo (1, 2 ou 3) baseado na posição cronológica
+  // dentro do mesmo group_name. Cada grupo tem 6 jogos: posições 1-2 = R1, 3-4 = R2, 5-6 = R3.
+  const getGroupRoundIndex = (m) => {
+    if (m.round !== 'Fase de Grupos' || !m.group_name) return null;
+    const groupMatches = matches
+      .filter(x => x.round === 'Fase de Grupos' && x.group_name === m.group_name)
+      .sort((a, b) => new Date(a.match_date) - new Date(b.match_date));
+    const pos = groupMatches.findIndex(x => x.id === m.id) + 1; // 1-indexed
+    if (pos <= 2) return 1;
+    if (pos <= 4) return 2;
+    return 3;
+  };
+
   // Função para retornar quais super palpites estão ativos e em qual jogo para a fase selecionada
   const getSuperGuessesStatus = () => {
     if (!user) return [];
 
     const stages = [];
     if (roundFilter === 'Fase de Grupos') {
-      stages.push({ key: 'Grupo - Rodada 1', label: 'Rodada 1 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 1 || idx === 2; } });
-      stages.push({ key: 'Grupo - Rodada 2', label: 'Rodada 2 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 3 || idx === 4; } });
-      stages.push({ key: 'Grupo - Rodada 3', label: 'Rodada 3 (Grupos)', check: (m) => { const idx = ((m.id - 1) % 6) + 1; return idx === 5 || idx === 6; } });
+      stages.push({ key: 'Grupo - Rodada 1', label: 'Rodada 1 (Grupos)', check: (m) => getGroupRoundIndex(m) === 1 });
+      stages.push({ key: 'Grupo - Rodada 2', label: 'Rodada 2 (Grupos)', check: (m) => getGroupRoundIndex(m) === 2 });
+      stages.push({ key: 'Grupo - Rodada 3', label: 'Rodada 3 (Grupos)', check: (m) => getGroupRoundIndex(m) === 3 });
     } else if (roundFilter === 'Disputa de 3º lugar' || roundFilter === 'Final') {
       stages.push({ key: 'Fase Final', label: 'Fase Final (3º Lugar ou Final)', check: (m) => m.round === 'Final' || m.round === 'Disputa de 3º lugar' });
     } else {
@@ -251,12 +264,11 @@ export default function Dashboard({ user, profile, showToast }) {
   };
 
   // Retorna o "bucket" de rodada de uma partida (usado para garantir 1 super palpite por rodada)
+  // Para Fase de Grupos: usa posição cronológica dentro do grupo (não o ID)
   const getMatchRoundBucket = (m) => {
     if (m.round === 'Fase de Grupos') {
-      const idx = ((m.id - 1) % 6) + 1;
-      if (idx <= 2) return 'Grupos-R1';
-      if (idx <= 4) return 'Grupos-R2';
-      return 'Grupos-R3';
+      const roundIdx = getGroupRoundIndex(m);
+      return `Grupos-R${roundIdx}`;
     }
     if (m.round === 'Disputa de 3º lugar' || m.round === 'Final') return 'Fase-Final';
     return m.round; // Rodada de 32, Quartas, Semis, etc.
@@ -285,9 +297,9 @@ export default function Dashboard({ user, profile, showToast }) {
     const newSuperState = !guess.is_super;
 
     if (newSuperState) {
-      const groupMatchIdx = ((matchId - 1) % 6) + 1;
+      const groupRoundIdx = match.round === 'Fase de Grupos' ? getGroupRoundIndex(match) : null;
       const stageName = match.round === 'Fase de Grupos'
-        ? (groupMatchIdx <= 2 ? 'Rodada 1 dos Grupos' : groupMatchIdx <= 4 ? 'Rodada 2 dos Grupos' : 'Rodada 3 dos Grupos')
+        ? `Rodada ${groupRoundIdx} dos Grupos`
         : (match.round === 'Disputa de 3º lugar' || match.round === 'Final' ? 'Fase Final' : match.round);
 
       const confirmed = window.confirm(
