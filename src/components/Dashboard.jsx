@@ -454,9 +454,9 @@ export default function Dashboard({ user, profile, showToast }) {
     if (match.guess_deadline) {
       return new Date(match.guess_deadline);
     }
-    // Subtrai 2 horas (2 * 60 * 60 * 1000 milissegundos) da data do jogo
+    // Subtrai 10 minutos (10 * 60 * 1000 milissegundos) da data do jogo
     const matchTime = new Date(match.match_date).getTime();
-    return new Date(matchTime - 2 * 60 * 60 * 1000);
+    return new Date(matchTime - 10 * 60 * 1000);
   };
 
   // Verifica se os palpites estão fechados para um jogo
