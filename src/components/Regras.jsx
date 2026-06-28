@@ -75,6 +75,23 @@ export default function Regras() {
           baseados nos <strong>90 minutos regulares</strong> (incluindo acréscimos).
           <br />Prorrogação e pênaltis <strong>não</strong> são considerados.
         </p>
+        
+        {/* Banner Informativo sobre a Pontuação Triplicada no Mata-Mata */}
+        <div style={{ 
+          marginTop: '15px', 
+          padding: '12px 18px', 
+          borderRadius: 'var(--radius-sm)', 
+          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(124, 58, 237, 0.15) 100%)', 
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          textAlign: 'left'
+        }}>
+          <span style={{ fontSize: '1.2rem', marginRight: '6px' }}>🔥</span>
+          <strong style={{ color: 'var(--accent-gold)' }}>MATA-MATA COM PONTOS TRIPLICADOS (3x):</strong>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+            A partir da <strong>Rodada de 32</strong> em diante, toda a pontuação obtida é <strong>triplicada automaticamente</strong>! 
+            Por exemplo: acertar o placar exato rende <strong>30 pontos</strong> (ou <strong>60 pontos</strong> com o Super Palpite!).
+          </p>
+        </div>
       </div>
 
       {/* Tabela de Pontuação */}

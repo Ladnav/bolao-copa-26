@@ -320,9 +320,11 @@ begin
   -- Caso o jogo passe para finalizado (finished) ou seja atualizado enquanto finalizado
   if (new.status = 'finished' and (old.status != 'finished' or old.home_score is distinct from new.home_score or old.away_score is distinct from new.away_score)) then
 
-    -- Atualiza pontos de todos os palpites desse jogo, dobrando se for super palpite
+    -- Atualiza pontos de todos os palpites desse jogo, dobrando se for super palpite e triplicando se for mata-mata (id >= 73)
     update public.guesses
-    set points_awarded = calculate_guess_points(home_guess, away_guess, new.home_score, new.away_score) * (case when is_super = true then 2 else 1 end)
+    set points_awarded = calculate_guess_points(home_guess, away_guess, new.home_score, new.away_score) 
+      * (case when is_super = true then 2 else 1 end)
+      * (case when new.id >= 73 then 3 else 1 end)
     where match_id = new.id;
 
     -- Recalcula os pontos dos usuários afetados
@@ -373,10 +375,12 @@ begin
     raise exception 'Acesso negado: apenas administradores podem executar esta função.';
   end if;
 
-  -- Para cada jogo finalizado, recalcular os pontos de todos os palpites
+  -- Para cada jogo finalizado, recalcular os pontos de todos os palpites (triplicando se id >= 73)
   for m in select * from public.matches where status = 'finished' and home_score is not null and away_score is not null loop
     update public.guesses
-    set points_awarded = calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score) * (case when is_super = true then 2 else 1 end)
+    set points_awarded = calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score) 
+      * (case when is_super = true then 2 else 1 end)
+      * (case when m.id >= 73 then 3 else 1 end)
     where match_id = m.id;
     updated_count := updated_count + 1;
   end loop;

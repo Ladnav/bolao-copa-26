@@ -714,10 +714,10 @@ export default function Dashboard({ user, profile, showToast }) {
                       +{guess.points_awarded} pts {guess.is_super ? '⭐' : ''}
                     </span>
                     <span style={{ fontSize: '0.65rem', color: guess.is_super ? 'rgba(0,0,0,0.8)' : 'var(--text-muted)', fontWeight: guess.is_super ? '700' : 'normal' }}>
-                       {guess.points_awarded === 20 || guess.points_awarded === 10 ? '⭐ Exato!' :
-                       guess.points_awarded === 14 || guess.points_awarded === 7 ? '🎯 Saldo' :
-                       guess.points_awarded === 10 || guess.points_awarded === 5 ? '✅ Venc+Gols' :
-                       guess.points_awarded === 6 || guess.points_awarded === 3 ? '👍 Vencedor' : '❌ Zerou'}
+                       {guess.points_awarded === 20 || guess.points_awarded === 10 || guess.points_awarded === 30 || guess.points_awarded === 60 ? '⭐ Exato!' :
+                       guess.points_awarded === 14 || guess.points_awarded === 7 || guess.points_awarded === 21 || guess.points_awarded === 42 ? '🎯 Saldo' :
+                       guess.points_awarded === 10 || guess.points_awarded === 5 || guess.points_awarded === 15 || guess.points_awarded === 30 ? '✅ Venc+Gols' :
+                       guess.points_awarded === 6 || guess.points_awarded === 3 || guess.points_awarded === 9 || guess.points_awarded === 18 ? '👍 Vencedor' : '❌ Zerou'}
                     </span>
                   </div>
                 )}
@@ -740,6 +740,30 @@ export default function Dashboard({ user, profile, showToast }) {
 
   return (
     <>
+      {/* Banner Informativo de Pontos Triplicados no Mata-Mata */}
+      <div 
+        className="glass-panel" 
+        style={{ 
+          marginBottom: '15px', 
+          padding: '12px 20px', 
+          borderRadius: 'var(--radius-sm)', 
+          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(124, 58, 237, 0.12) 100%)', 
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}
+      >
+        <span style={{ fontSize: '1.5rem' }}>🔥</span>
+        <div>
+          <strong style={{ color: 'var(--accent-gold)', fontSize: '0.9rem' }}>MATA-MATA COMEÇOU! PONTOS TRIPLICADOS (3x)</strong>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px', margin: 0 }}>
+            A partir da Rodada de 32, a pontuação de todos os jogos vale o <strong>triplo</strong>! 
+            Palpite exato vale <strong>30 pontos</strong> (ou <strong>60 pontos</strong> com o seu Super Palpite!).
+          </p>
+        </div>
+      </div>
+
       <div>
       {/* Barra de Filtros */}
       <div className="filter-bar glass-panel" style={{ padding: '15px 20px', borderRadius: 'var(--radius-sm)' }}>

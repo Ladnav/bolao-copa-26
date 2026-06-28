@@ -188,12 +188,14 @@ BEGIN
   FOR m IN SELECT * FROM public.matches WHERE status = 'finished' AND home_score IS NOT NULL AND away_score IS NOT NULL LOOP
     UPDATE public.guesses
     SET points_awarded = calculate_guess_points(home_guess, away_guess, m.home_score, m.away_score)
+      * (CASE WHEN is_super = true THEN 2 ELSE 1 END)
+      * (CASE WHEN m.id >= 73 THEN 3 ELSE 1 END)
     WHERE match_id = m.id;
     updated_count := updated_count + 1;
   END LOOP;
 
   FOR g IN SELECT DISTINCT user_id FROM public.guesses LOOP
-    PERFORM recalculate_user_points(g.user_id);
+    PERFORM public.recalculate_user_points(g.user_id);
   END LOOP;
 
   RETURN 'Recálculo completo! ' || updated_count || ' jogos finalizados processados.';
@@ -311,21 +313,21 @@ CREATE TRIGGER check_and_limit_super_guess_trigger
   EXECUTE FUNCTION public.tr_check_and_limit_super_guess();
 
 
--- 11. Super Palpite: Atualizar recálculo de pontos do usuário para contar placares com pontos dobrados (10->20, 7->14)
+-- 11. Super Palpite: Atualizar recálculo de pontos do usuário para contar placares com pontos dobrados (10->20, 7->14) e triplicados no mata-mata
 CREATE OR REPLACE FUNCTION public.recalculate_user_points(p_user_id uuid)
 RETURNS void AS $$
 BEGIN
   UPDATE public.profiles
   SET
     total_points       = COALESCE((SELECT SUM(points_awarded) FROM public.guesses WHERE user_id = p_user_id AND points_awarded IS NOT NULL), 0),
-    exact_scores_count = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded = 10 OR (is_super = true AND points_awarded = 20))), 0),
-    pts7_count         = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded = 7 OR (is_super = true AND points_awarded = 14))), 0)
+    exact_scores_count = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded IN (10, 20, 30, 60))), 0),
+    pts7_count         = COALESCE((SELECT COUNT(*)            FROM public.guesses WHERE user_id = p_user_id AND (points_awarded IN (7, 14, 21, 42))), 0)
   WHERE id = p_user_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 12. Super Palpite: Atualizar trigger de encerramento de jogos para dobrar pontos se is_super = true
+-- 12. Super Palpite: Atualizar trigger de encerramento de jogos para dobrar pontos se is_super = true e triplicar se mata-mata (id >= 73)
 CREATE OR REPLACE FUNCTION public.trigger_update_match_scores()
 RETURNS trigger AS $$
 DECLARE
@@ -333,7 +335,9 @@ DECLARE
 BEGIN
   IF (NEW.status = 'finished' AND (OLD.status != 'finished' OR OLD.home_score IS DISTINCT FROM NEW.home_score OR OLD.away_score IS DISTINCT FROM NEW.away_score)) THEN
     UPDATE public.guesses
-    SET points_awarded = public.calculate_guess_points(home_guess, away_guess, NEW.home_score, NEW.away_score) * (CASE WHEN is_super = true THEN 2 ELSE 1 END)
+    SET points_awarded = public.calculate_guess_points(home_guess, away_guess, NEW.home_score, NEW.away_score) 
+      * (CASE WHEN is_super = true THEN 2 ELSE 1 END)
+      * (CASE WHEN NEW.id >= 73 THEN 3 ELSE 1 END)
     WHERE match_id = NEW.id;
 
     FOR guess_record IN SELECT DISTINCT user_id FROM public.guesses WHERE match_id = NEW.id LOOP
