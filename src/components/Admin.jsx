@@ -153,6 +153,181 @@ export default function Admin({ profile, showToast }) {
     }
   };
 
+  const updateKnockoutTeams = async () => {
+    if (!window.confirm('Deseja calcular e atualizar os confrontos do Mata-Mata (Rodada de 32) baseado na classificação atual dos grupos?')) return;
+
+    setLoading(true);
+    try {
+      // 1. Buscar todas as partidas do banco
+      const { data: allMatches, error: matchesError } = await supabase
+        .from('matches')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (matchesError) throw matchesError;
+
+      const groupMatches = allMatches.filter(m => m.id <= 72);
+      const r32Matches = allMatches.filter(m => m.id >= 73 && m.id <= 88);
+
+      if (r32Matches.length === 0) {
+        throw new Error('As partidas do mata-mata ainda não foram semeadas! Clique em "Semear Mata-Mata" primeiro.');
+      }
+
+      // Mapear bandeiras
+      const flags = {};
+      groupMatches.forEach(m => {
+        if (m.home_team && m.home_team_flag) flags[m.home_team] = m.home_team_flag;
+        if (m.away_team && m.away_team_flag) flags[m.away_team] = m.away_team_flag;
+      });
+
+      // Calcular classificação
+      const groups = {};
+      groupMatches.forEach(m => {
+        if (!groups[m.group_name]) {
+          groups[m.group_name] = {};
+        }
+        if (!groups[m.group_name][m.home_team]) {
+          groups[m.group_name][m.home_team] = { name: m.home_team, flag: flags[m.home_team], pts: 0, pj: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0 };
+        }
+        if (!groups[m.group_name][m.away_team]) {
+          groups[m.group_name][m.away_team] = { name: m.away_team, flag: flags[m.away_team], pts: 0, pj: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0 };
+        }
+
+        if (m.status === 'finished') {
+          const h = groups[m.group_name][m.home_team];
+          const a = groups[m.group_name][m.away_team];
+          h.pj++;
+          a.pj++;
+          h.gp += m.home_score;
+          h.gc += m.away_score;
+          a.gp += m.away_score;
+          a.gc += m.home_score;
+          h.sg = h.gp - h.gc;
+          a.sg = a.gp - a.gc;
+
+          if (m.home_score > m.away_score) {
+            h.pts += 3;
+            h.v++;
+            a.d++;
+          } else if (m.home_score < m.away_score) {
+            a.pts += 3;
+            a.v++;
+            h.d++;
+          } else {
+            h.pts += 1;
+            a.pts += 1;
+            h.e++;
+            a.e++;
+          }
+        }
+      });
+
+      const firsts = {};
+      const seconds = {};
+      const thirds = [];
+
+      for (const gName in groups) {
+        const list = Object.values(groups[gName]);
+        list.sort((a, b) => {
+          if (b.pts !== a.pts) return b.pts - a.pts;
+          if (b.sg !== a.sg) return b.sg - a.sg;
+          if (b.gp !== a.gp) return b.gp - a.gp;
+          return a.name.localeCompare(b.name);
+        });
+
+        firsts[gName] = list[0];
+        seconds[gName] = list[1];
+        thirds.push({ ...list[2], group: gName });
+      }
+
+      // Ordenar terceiros colocados
+      thirds.sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.sg !== a.sg) return b.sg - a.sg;
+        if (b.gp !== a.gp) return b.gp - a.gp;
+        return a.name.localeCompare(b.name);
+      });
+
+      const bestThirds = thirds.slice(0, 8);
+
+      const mapping = {
+        '1º Grupo A': firsts['A'], '2º Grupo A': seconds['A'],
+        '1º Grupo B': firsts['B'], '2º Grupo B': seconds['B'],
+        '1º Grupo C': firsts['C'], '2º Grupo C': seconds['C'],
+        '1º Grupo D': firsts['D'], '2º Grupo D': seconds['D'],
+        '1º Grupo E': firsts['E'], '2º Grupo E': seconds['E'],
+        '1º Grupo F': firsts['F'], '2º Grupo F': seconds['F'],
+        '1º Grupo G': firsts['G'], '2º Grupo G': seconds['G'],
+        '1º Grupo H': firsts['H'], '2º Grupo H': seconds['H'],
+        '1º Grupo I': firsts['I'], '2º Grupo I': seconds['I'],
+        '1º Grupo J': firsts['J'], '2º Grupo J': seconds['J'],
+        '1º Grupo K': firsts['K'], '2º Grupo K': seconds['K'],
+        '1º Grupo L': firsts['L'], '2º Grupo L': seconds['L'],
+      };
+
+      // Pareamento dos terceiros colocados usando ordem de prioridade de grupo
+      const t_abcdf = bestThirds.find(t => ['A','B','C','D','F'].includes(t.group));
+      if (t_abcdf) bestThirds.splice(bestThirds.indexOf(t_abcdf), 1);
+
+      const t_cdfgh = bestThirds.find(t => ['C','D','F','G','H'].includes(t.group));
+      if (t_cdfgh) bestThirds.splice(bestThirds.indexOf(t_cdfgh), 1);
+
+      const t_cefhi = bestThirds.find(t => ['C','E','F','H','I'].includes(t.group));
+      if (t_cefhi) bestThirds.splice(bestThirds.indexOf(t_cefhi), 1);
+
+      const t_ehijk = bestThirds.find(t => ['E','H','I','J','K'].includes(t.group));
+      if (t_ehijk) bestThirds.splice(bestThirds.indexOf(t_ehijk), 1);
+
+      const t_aehij = bestThirds.find(t => ['A','E','H','I','J'].includes(t.group));
+      if (t_aehij) bestThirds.splice(bestThirds.indexOf(t_aehij), 1);
+
+      const t_befij = bestThirds.find(t => ['B','E','F','I','J'].includes(t.group));
+      if (t_befij) bestThirds.splice(bestThirds.indexOf(t_befij), 1);
+
+      const t_efgij = bestThirds.find(t => ['E','F','G','I','J'].includes(t.group));
+      if (t_efgij) bestThirds.splice(bestThirds.indexOf(t_efgij), 1);
+
+      const t_deijl = bestThirds[0];
+
+      mapping['3º Grupo A/B/C/D/F'] = t_abcdf;
+      mapping['3º Grupo C/D/F/G/H'] = t_cdfgh;
+      mapping['3º Grupo C/E/F/H/I'] = t_cefhi;
+      mapping['3º Grupo E/H/I/J/K'] = t_ehijk;
+      mapping['3º Grupo A/E/H/I/J'] = t_aehij;
+      mapping['3º Grupo B/E/F/I/J'] = t_befij;
+      mapping['3º Grupo E/F/G/I/J'] = t_efgij;
+      mapping['3º Grupo D/E/I/J/L'] = t_deijl;
+
+      // Executa updates no banco
+      for (const m of r32Matches) {
+        const homeTeam = mapping[m.home_team];
+        const awayTeam = mapping[m.away_team];
+
+        if (homeTeam && awayTeam) {
+          const { error: updateError } = await supabase
+            .from('matches')
+            .update({
+              home_team: homeTeam.name,
+              home_team_flag: homeTeam.flag || '',
+              away_team: awayTeam.name,
+              away_team_flag: awayTeam.flag || ''
+            })
+            .eq('id', m.id);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      showToast('Confrontos do mata-mata atualizados com sucesso no banco de dados! 🏆', 'success');
+      fetchMatches();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao atualizar times do mata-mata: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateMatchResult = async (matchId) => {
     const edit = editScores[matchId];
     const match = matches.find(m => m.id === matchId);
@@ -250,6 +425,8 @@ export default function Admin({ profile, showToast }) {
           });
         }, 5000);
       }
+      setExpandedEditTeams(null);
+      setExpandedDeadline(null);
     } catch (err) {
       console.error(err);
       showToast('Erro ao atualizar jogo: ' + err.message, 'error');
@@ -418,6 +595,13 @@ export default function Admin({ profile, showToast }) {
           >
             <RefreshCw size={14} style={{ marginRight: '5px' }} />
             {recalcLoading ? 'Recalculando...' : 'Recalcular Pontos'}
+          </button>
+          <button
+            className="btn-primary"
+            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}
+            onClick={updateKnockoutTeams}
+          >
+            🏆 Preencher Times do Mata-Mata
           </button>
           <button
             className="btn-primary"
