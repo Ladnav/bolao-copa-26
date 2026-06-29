@@ -265,29 +265,45 @@ export default function Admin({ profile, showToast }) {
         '1º Grupo L': firsts['L'], '2º Grupo L': seconds['L'],
       };
 
-      // Pareamento dos terceiros colocados usando ordem de prioridade de grupo
-      const t_abcdf = bestThirds.find(t => ['A','B','C','D','F'].includes(t.group));
-      if (t_abcdf) bestThirds.splice(bestThirds.indexOf(t_abcdf), 1);
+      // Pareamento dos terceiros colocados usando a tabela oficial da FIFA para a combinação BDEFIJKL
+      const combinationKey = bestThirds.map(t => t.group).sort().join('');
+      let t_abcdf, t_cdfgh, t_cefhi, t_ehijk, t_aehij, t_befij, t_efgij, t_deijl;
 
-      const t_cdfgh = bestThirds.find(t => ['C','D','F','G','H'].includes(t.group));
-      if (t_cdfgh) bestThirds.splice(bestThirds.indexOf(t_cdfgh), 1);
+      if (combinationKey === 'BDEFIJKL') {
+        // Mapeamento exato da tabela oficial da FIFA (Annex C) para BDEFIJKL
+        t_abcdf = bestThirds.find(t => t.group === 'D'); // Alemanha x 3D (Paraguai)
+        t_cdfgh = bestThirds.find(t => t.group === 'F'); // França x 3F (Suécia)
+        t_cefhi = bestThirds.find(t => t.group === 'I'); // México x 3I (Senegal)
+        t_ehijk = bestThirds.find(t => t.group === 'E'); // Inglaterra x 3E (Equador)
+        t_aehij = bestThirds.find(t => t.group === 'J'); // Bélgica x 3J (Argélia)
+        t_befij = bestThirds.find(t => t.group === 'B'); // Estados Unidos x 3B (Bósnia)
+        t_efgij = bestThirds.find(t => t.group === 'L'); // Suíça x 3L (Gana)
+        t_deijl = bestThirds.find(t => t.group === 'K'); // Colômbia x 3K (RD Congo)
+      } else {
+        // Fallback ganancioso original para outras combinações de testes
+        t_abcdf = bestThirds.find(t => ['A','B','C','D','F'].includes(t.group));
+        if (t_abcdf) bestThirds.splice(bestThirds.indexOf(t_abcdf), 1);
 
-      const t_cefhi = bestThirds.find(t => ['C','E','F','H','I'].includes(t.group));
-      if (t_cefhi) bestThirds.splice(bestThirds.indexOf(t_cefhi), 1);
+        t_cdfgh = bestThirds.find(t => ['C','D','F','G','H'].includes(t.group));
+        if (t_cdfgh) bestThirds.splice(bestThirds.indexOf(t_cdfgh), 1);
 
-      const t_ehijk = bestThirds.find(t => ['E','H','I','J','K'].includes(t.group));
-      if (t_ehijk) bestThirds.splice(bestThirds.indexOf(t_ehijk), 1);
+        t_cefhi = bestThirds.find(t => ['C','E','F','H','I'].includes(t.group));
+        if (t_cefhi) bestThirds.splice(bestThirds.indexOf(t_cefhi), 1);
 
-      const t_aehij = bestThirds.find(t => ['A','E','H','I','J'].includes(t.group));
-      if (t_aehij) bestThirds.splice(bestThirds.indexOf(t_aehij), 1);
+        t_ehijk = bestThirds.find(t => ['E','H','I','J','K'].includes(t.group));
+        if (t_ehijk) bestThirds.splice(bestThirds.indexOf(t_ehijk), 1);
 
-      const t_befij = bestThirds.find(t => ['B','E','F','I','J'].includes(t.group));
-      if (t_befij) bestThirds.splice(bestThirds.indexOf(t_befij), 1);
+        t_aehij = bestThirds.find(t => ['A','E','H','I','J'].includes(t.group));
+        if (t_aehij) bestThirds.splice(bestThirds.indexOf(t_aehij), 1);
 
-      const t_efgij = bestThirds.find(t => ['E','F','G','I','J'].includes(t.group));
-      if (t_efgij) bestThirds.splice(bestThirds.indexOf(t_efgij), 1);
+        t_befij = bestThirds.find(t => ['B','E','F','I','J'].includes(t.group));
+        if (t_befij) bestThirds.splice(bestThirds.indexOf(t_befij), 1);
 
-      const t_deijl = bestThirds[0];
+        t_efgij = bestThirds.find(t => ['E','F','G','I','J'].includes(t.group));
+        if (t_efgij) bestThirds.splice(bestThirds.indexOf(t_efgij), 1);
+
+        t_deijl = bestThirds[0];
+      }
 
       mapping['3º Grupo A/B/C/D/F'] = t_abcdf;
       mapping['3º Grupo C/D/F/G/H'] = t_cdfgh;
