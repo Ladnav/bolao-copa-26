@@ -270,15 +270,15 @@ export default function Admin({ profile, showToast }) {
       let t_abcdf, t_cdfgh, t_cefhi, t_ehijk, t_aehij, t_befij, t_efgij, t_deijl;
 
       if (combinationKey === 'BDEFIJKL') {
-        // Mapeamento exato da tabela oficial da FIFA (Annex C) para BDEFIJKL
-        t_abcdf = bestThirds.find(t => t.group === 'D'); // Alemanha x 3D (Paraguai)
-        t_cdfgh = bestThirds.find(t => t.group === 'F'); // França x 3F (Suécia)
-        t_cefhi = bestThirds.find(t => t.group === 'I'); // México x 3I (Senegal)
-        t_ehijk = bestThirds.find(t => t.group === 'E'); // Inglaterra x 3E (Equador)
-        t_aehij = bestThirds.find(t => t.group === 'J'); // Bélgica x 3J (Argélia)
-        t_befij = bestThirds.find(t => t.group === 'B'); // Estados Unidos x 3B (Bósnia)
-        t_efgij = bestThirds.find(t => t.group === 'L'); // Suíça x 3L (Gana)
-        t_deijl = bestThirds.find(t => t.group === 'K'); // Colômbia x 3K (RD Congo)
+        // Mapeamento manual corrigido conforme solicitação do usuário
+        t_abcdf = bestThirds.find(t => t.group === 'D'); // Jogo 75: Alemanha x 3D (Paraguai)
+        t_cdfgh = bestThirds.find(t => t.group === 'F'); // Jogo 78: França x 3F (Suécia)
+        t_cefhi = bestThirds.find(t => t.group === 'E'); // Jogo 79: México x 3E (Equador)
+        t_ehijk = bestThirds.find(t => t.group === 'K'); // Jogo 80: Inglaterra x 3K (RD Congo)
+        t_aehij = bestThirds.find(t => t.group === 'I'); // Jogo 81: Bélgica x 3I (Senegal)
+        t_befij = bestThirds.find(t => t.group === 'B'); // Jogo 82: Estados Unidos x 3B (Bósnia)
+        t_efgij = bestThirds.find(t => t.group === 'J'); // Jogo 85: Suíça x 3J (Argélia)
+        t_deijl = bestThirds.find(t => t.group === 'L'); // Jogo 88: Colômbia x 3L (Gana)
       } else {
         // Fallback ganancioso original para outras combinações de testes
         t_abcdf = bestThirds.find(t => ['A','B','C','D','F'].includes(t.group));
@@ -339,6 +339,111 @@ export default function Admin({ profile, showToast }) {
     } catch (err) {
       console.error(err);
       showToast('Erro ao atualizar times do mata-mata: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateOitavasTeams = async () => {
+    if (!window.confirm('Deseja calcular e preencher os confrontos das Oitavas de Final (IDs 89 a 96) baseado nos resultados da Rodada de 32?')) return;
+
+    setLoading(true);
+    try {
+      // 1. Buscar todas as partidas do banco
+      const { data: allMatches, error: matchesError } = await supabase
+        .from('matches')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (matchesError) throw matchesError;
+
+      const r32Matches = allMatches.filter(m => m.id >= 73 && m.id <= 88);
+      const oitavasMatches = allMatches.filter(m => m.id >= 89 && m.id <= 96);
+
+      if (oitavasMatches.length === 0) {
+        throw new Error('As partidas de oitavas ainda não foram semeadas!');
+      }
+
+      // Mapear bandeiras de todos os times conhecidos
+      const flags = {};
+      allMatches.forEach(m => {
+        if (m.home_team && m.home_team_flag) flags[m.home_team] = m.home_team_flag;
+        if (m.away_team && m.away_team_flag) flags[m.away_team] = m.away_team_flag;
+      });
+
+      // Mapeamento de vencedores definidos manualmente para empates
+      // e lógica padrão para jogos com vencedor no placar regular
+      const tieWinners = {
+        75: 'Paraguai',
+        76: 'Marrocos',
+        81: 'Bélgica',
+        86: 'Egito',
+        87: 'Argentina'
+      };
+
+      const winners = {};
+      for (const m of r32Matches) {
+        if (m.status !== 'finished') {
+          throw new Error(`O jogo #${m.id} (${m.home_team} x ${m.away_team}) da Rodada de 32 ainda não foi finalizado!`);
+        }
+
+        const hScore = m.home_score;
+        const aScore = m.away_score;
+
+        if (hScore > aScore) {
+          winners[m.id] = m.home_team;
+        } else if (aScore > hScore) {
+          winners[m.id] = m.away_team;
+        } else {
+          // Caso de empate, pega do mapeamento manual
+          const tw = tieWinners[m.id];
+          if (!tw) {
+            throw new Error(`Jogo #${m.id} terminou empatado. Por favor, configure quem avançou nas configurações do script.`);
+          }
+          winners[m.id] = tw;
+        }
+      }
+
+      // Cruzamentos oficiais das Oitavas de Final (ids 89 a 96)
+      const oitavasPairings = {
+        89: { homeKey: 73, awayKey: 75 },
+        90: { homeKey: 74, awayKey: 77 },
+        91: { homeKey: 76, awayKey: 78 },
+        92: { homeKey: 79, awayKey: 80 },
+        93: { homeKey: 83, awayKey: 84 },
+        94: { homeKey: 81, awayKey: 82 },
+        95: { homeKey: 86, awayKey: 88 },
+        96: { homeKey: 85, awayKey: 87 }
+      };
+
+      // Executa updates no banco para as oitavas
+      for (const m of oitavasMatches) {
+        const pairing = oitavasPairings[m.id];
+        if (pairing) {
+          const homeTeam = winners[pairing.homeKey];
+          const awayTeam = winners[pairing.awayKey];
+
+          if (homeTeam && awayTeam) {
+            const { error: updateError } = await supabase
+              .from('matches')
+              .update({
+                home_team: homeTeam,
+                home_team_flag: flags[homeTeam] || '',
+                away_team: awayTeam,
+                away_team_flag: flags[awayTeam] || ''
+              })
+              .eq('id', m.id);
+
+            if (updateError) throw updateError;
+          }
+        }
+      }
+
+      showToast('Confrontos das Oitavas de Final preenchidos com sucesso! 🏆', 'success');
+      fetchMatches();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao atualizar Oitavas: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -618,6 +723,13 @@ export default function Admin({ profile, showToast }) {
             onClick={updateKnockoutTeams}
           >
             🏆 Preencher Times do Mata-Mata
+          </button>
+          <button
+            className="btn-primary"
+            style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}
+            onClick={updateOitavasTeams}
+          >
+            🏆 Preencher Oitavas
           </button>
           <button
             className="btn-primary"
